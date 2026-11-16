@@ -36,6 +36,8 @@ def _panel(model, elem, real=np.float64):
     vd2 = [gp4[i] - gp2[i] for i in range(3)]
     vkn = _cross(vd1, vd2)
     vkl = sqrt(vkn[0] ** 2 + vkn[1] ** 2 + vkn[2] ** 2)
+    if vkl == 0.0:
+        raise ValueError(f"CSHEAR {elem.id}: bad geometry")
     vk = [c / vkl for c in vkn]
     pa = 0.5 * vkl
     v12 = [gp2[i] - gp1[i] for i in range(3)]
@@ -43,15 +45,19 @@ def _panel(model, elem, real=np.float64):
     v12dk = _dot(v12, vk)
     vp12 = [v12[i] - v12dk * vk[i] for i in range(3)]
     x2 = sqrt(vp12[0] ** 2 + vp12[1] ** 2 + vp12[2] ** 2)
+    if x2 == 0.0:
+        raise ValueError(f"CSHEAR {elem.id}: bad geometry")
     vi = [c / x2 for c in vp12]
     vj = _cross(vk, vi)
     vjl = sqrt(vj[0] ** 2 + vj[1] ** 2 + vj[2] ** 2)
+    if vjl == 0.0:
+        raise ValueError(f"CSHEAR {elem.id}: bad geometry")
     vj = [c / vjl for c in vj]
     x1 = y1 = y2 = real(0.0)
     x3, y3 = _dot(vi, vd1), _dot(vj, vd1)
     x4 = -vi[0] * v41[0] - vi[1] * v41[1] - vi[2] * v41[2]
     y4 = -vj[0] * v41[0] - vj[1] * v41[1] - vj[2] * v41[2]
-    if y3 <= 0.0 or x3 <= y3 * x4 / y4 or y4 <= 0.0 or x4 >= x2 - (x2 - x3) * y4 / y3:
+    if y3 <= 0.0 or y4 <= 0.0 or x3 <= y3 * x4 / y4 or x4 >= x2 - (x2 - x3) * y4 / y3:
         raise ValueError(f"CSHEAR {elem.id}: interior angle not less than 180 degrees")
 
     xs, ys = (x1, x2, x3, x4), (y1, y2, y3, y4)
