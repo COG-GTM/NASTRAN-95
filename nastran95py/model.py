@@ -123,6 +123,13 @@ def build_model(text):
 
 def _thru(fields):
     vals = [f for f in fields if f is not None]
-    if len(vals) == 3 and vals[1] == "THRU":
-        return list(range(vals[0], vals[2] + 1))
-    return vals
+    out = []
+    i = 0
+    while i < len(vals):
+        if i + 2 < len(vals) and vals[i + 1] == "THRU":
+            out.extend(range(vals[i], vals[i + 2] + 1))
+            i += 3
+        else:
+            out.append(vals[i])
+            i += 1
+    return out

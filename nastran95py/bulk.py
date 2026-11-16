@@ -85,9 +85,16 @@ def read_deck(text):
 
 
 def case_control(case_lines):
-    """Subcase-1 case control as {KEY: value-string}, e.g. {'SPC': '1', 'LOAD': '1'}."""
+    """Subcase-1 case control as {KEY: value-string}, e.g. {'SPC': '1', 'LOAD': '1'}: the
+    defaults above the first SUBCASE plus that subcase's own entries."""
     out = {}
+    subcases = 0
     for ln in case_lines:
+        if ln.strip().upper().startswith("SUBCASE"):
+            subcases += 1
+            if subcases > 1:
+                break
+            continue
         if "=" in ln:
             k, v = ln.split("=", 1)
             out[k.strip().upper()] = v.strip()
