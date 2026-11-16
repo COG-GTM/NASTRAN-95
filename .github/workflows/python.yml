@@ -3,9 +3,9 @@ name: python
 on:
   push:
     branches: [master, main]
-    paths: ["python/**", "mis/**", ".github/workflows/python.yml"]
+    paths: ["python/**", "mis/**", "inp/**", "demoout/**", ".github/workflows/python.yml"]
   pull_request:
-    paths: ["python/**", "mis/**", ".github/workflows/python.yml"]
+    paths: ["python/**", "mis/**", "inp/**", "demoout/**", ".github/workflows/python.yml"]
   workflow_dispatch:
 
 jobs:
@@ -33,6 +33,8 @@ jobs:
         run: |
           ruff check .
           ruff format --check .
+      - name: Reference manifest is current
+        run: python -m nastran95py.reference.inventory --check
       - name: Build shared-kernel Fortran harness
         run: make -C tests/fortran_kernels
       - name: Build element Fortran harness (if present)

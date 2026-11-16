@@ -16,6 +16,24 @@ is no bulk-data deck processing, DMAP sequencing or matrix assembly here.
 | `nastran95py.elements` | EST/ECPT record contract (`ElementData`, `EcptLayout`; ROD, BAR layouts) |
 | `nastran95py.io` | 32-bit INTEGER/REAL word reinterpretation, Fortran `D` exponents |
 
+## Reference baseline
+
+`nastran95py.reference` inventories the Rigid Format 1 demo decks in `../inp/`
+and indexes their COSMIC listings in `../demoout/` (the Fortran reference, since
+`../bin/nastrn.exe` is a SPARC build). Its deck reader covers only what the
+inventory needs. Generated outputs:
+
+- `tests/reference/manifest.json`: machine-readable manifest (elements,
+  properties, materials, loads, subcases/output requests, listing section page and
+  line ranges, printed matrices, consistency checks). Load it with
+  `nastran95py.reference.inventory.load_manifest()`.
+- `tests/reference/DECKS.md`: the same inventory as a readable catalogue.
+
+```bash
+python -m nastran95py.reference.inventory          # regenerate
+python -m nastran95py.reference.inventory --check  # fail if stale (CI)
+```
+
 ## Setup
 
 ```bash
