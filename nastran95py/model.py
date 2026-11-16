@@ -43,6 +43,7 @@ class Model:
     elements: list = field(default_factory=list)
     forces: dict = field(default_factory=dict)  # sid -> [(gid, cid, f, (n1, n2, n3), kind)]
     spcs: dict = field(default_factory=dict)  # sid -> [(gid, comps str)]
+    loads: dict = field(default_factory=dict)  # LOAD sid -> (S, [(Si, Li)])
     params: dict = field(default_factory=dict)
     case: dict = field(default_factory=dict)
 
@@ -98,6 +99,9 @@ def build_model(text):
         elif name in ("FORCE", "MOMENT"):
             n = np.array([float(_f(c, i, 0.0)) for i in (5, 6, 7)])
             m.forces.setdefault(c[1], []).append((c[2], _f(c, 3, 0), float(_f(c, 4, 0.0)), n, name))
+        elif name == "LOAD":
+            rest = [v for v in c[3:] if v is not None]
+            m.loads[c[1]] = (float(c[2]), [(float(rest[i]), rest[i + 1]) for i in range(0, len(rest) - 1, 2)])
         elif name == "SPC1":
             m.spcs.setdefault(c[1], []).extend((g, str(c[2])) for g in _thru(c[3:]))
         elif name == "SPC":

@@ -40,6 +40,11 @@ def assemble(model):
 
 def load_vector(model, sid, order, index):
     p = np.zeros(6 * len(order))
+    if sid in model.loads:
+        scale, parts = model.loads[sid]
+        for si, li in parts:
+            p += scale * si * load_vector(model, li, order, index)
+        return p
     for gid, cid, f, n, kind in model.forces.get(sid, []):
         if cid:
             raise NotImplementedError("loads in a local coordinate system are not ported")
