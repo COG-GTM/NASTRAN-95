@@ -22,6 +22,10 @@ def tables_in_scope(golden):
 def _tolerance(model, golden, result):
     disp = {g: np.array([v for v, _ in row]) for g, row in golden[DISPLACEMENT].items()}
     du = parity.displacement_uncertainty(golden, result.disp)
+    for g, u in result.disp.items():  # grids the deck does not print: Python values, f32 rounding
+        if g not in disp:
+            disp[g] = np.asarray(u, dtype=float)
+            du[g] = parity.F32_EPS * np.abs(disp[g])
     return parity.recovery_tolerance(model, disp, du)
 
 
