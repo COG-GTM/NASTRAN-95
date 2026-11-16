@@ -36,7 +36,10 @@ def _geometry(model, elem):
     ez = vec / mag
     twoh = d12 @ ez
     vec = d12 - twoh * ez
-    ex = vec / np.linalg.norm(vec)
+    mag = np.linalg.norm(vec)
+    if mag <= 0.0:
+        raise ValueError(f" CQDMEM2 {elem.id}: illegal geometry")
+    ex = vec / mag
     e = np.array([ex, np.cross(ez, ex), ez])
     pts = np.vstack([g, g.mean(axis=0)])
     rmat = (pts - g[0]) @ e.T
@@ -47,16 +50,23 @@ def _geometry(model, elem):
 
 
 def _triangle(ra, rb, rc, sinth, costh, gsube, t):
-    """Q2TRMD/Q2TRMS: K partitions {(i, j): 3x3} for i, j in A,B,C (0, 1, 2) and S_i = G H_i."""
+    """Q2TRMD/Q2TRMS: K partitions {(i, j): 3x3} for i, j in A,B,C (0, 1, 2) and S_i = G H_i.
+
+    Returns None for a degenerate triangle (Q2TRMD IERROR = 1).
+    """
     v12, v13 = rb - ra, rc - ra
     kvec = np.cross(v12, v13)
     mag = np.linalg.norm(kvec)
+    xb = np.linalg.norm(v12)
+    if mag <= 0.0 or xb <= 0.0:
+        return None
     kvec /= mag
     area = 0.5 * mag
-    xb = np.linalg.norm(v12)
     ivec = v12 / xb
     jvec = np.cross(kvec, ivec)
     m = np.hypot(ivec[0], ivec[1])
+    if m <= 0.0:
+        return None
     ic = (ivec[0] * costh + ivec[1] * sinth) / m
     is_ = (ivec[0] * sinth - ivec[1] * costh) / m
     xc, yc = ivec @ v13, jvec @ v13
