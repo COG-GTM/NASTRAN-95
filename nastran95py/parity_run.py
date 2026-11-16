@@ -5,6 +5,8 @@
 import re
 import sys
 
+import numpy as np
+
 from . import f06, parity
 from .elements import REGISTRY
 from .model import build_model
@@ -17,14 +19,27 @@ def tables_in_scope(golden):
     return [t for t in golden if t in (DISPLACEMENT, SPCFORCE) or IN_SCOPE.search(t)]
 
 
+def _tolerance(model, golden, result):
+    disp = {g: np.array([v for v, _ in row]) for g, row in golden[DISPLACEMENT].items()}
+    du = parity.displacement_uncertainty(golden, result.disp)
+    return parity.recovery_tolerance(model, disp, du)
+
+
+def parity_problems(model, golden, result, titles=None):
+    return parity.compare(golden, result.tables, titles or tables_in_scope(golden),
+                          _tolerance(model, golden, result))
+
+
 def main(argv):
     deck, listing = argv
     with open(deck, errors="replace") as f:
-        result = solve(build_model(f.read()))
+        model = build_model(f.read())
+    result = solve(model)
     golden = f06.parse_file(listing)
+    tol = _tolerance(model, golden, result)
     failed = 0
     for title in tables_in_scope(golden):
-        problems = parity.compare(golden, result.tables, [title])
+        problems = parity.compare(golden, result.tables, [title], tol)
         n = sum(len(row) for row in golden[title].values())
         print(f"{'PASS' if not problems else 'FAIL'}  {title:<52} {n:5d} values")
         for p in problems[:3]:

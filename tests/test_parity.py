@@ -2,15 +2,17 @@
 
 Recovery tests feed the Fortran displacement vector into one element type's recovery, so
 each element can be checked on its own. The static tests run the whole Python solution.
-Tolerance: see nastran95py/parity.py (rtol 1e-5 plus one printed digit).
+Tolerance: see nastran95py/parity.py (rtol 1e-5 plus one printed digit, plus the
+single-precision recovery allowance for element forces and stresses).
 """
+import numpy as np
 import pytest
 
 from conftest import ROOT
 from nastran95py import f06, parity
 from nastran95py.elements import REGISTRY
 from nastran95py.model import build_model
-from nastran95py.parity_run import tables_in_scope
+from nastran95py.parity_run import parity_problems
 from nastran95py.static import recover, solve
 
 DECKS = ["d01013a_all", "d01014a_all"]
@@ -37,13 +39,13 @@ def test_element_recovery(deck, etype):
     if not titles:
         pytest.skip(f"{deck} has no {etype}")
     model.elements = [e for e in model.elements if e.type == etype]
-    import numpy as np
     disp = {g: np.array([v for v, _ in row]) for g, row in golden["DISPLACEMENT VECTOR"].items()}
     try:
         tables = recover(model, disp)
     except NotImplementedError as exc:
         _skip_unported(exc)
-    assert parity.compare(golden, tables, titles) == []
+    tol = parity.recovery_tolerance(model, disp, parity.displacement_uncertainty(golden))
+    assert parity.compare(golden, tables, titles, tol) == []
 
 
 @pytest.mark.parametrize("deck", DECKS + NASA_DECKS)
@@ -53,7 +55,7 @@ def test_static_solution(deck):
         result = solve(model)
     except NotImplementedError as exc:
         _skip_unported(exc)
-    assert parity.compare(golden, result.tables, tables_in_scope(golden)) == []
+    assert parity_problems(model, golden, result) == []
 
 
 def test_every_element_type_has_a_module():

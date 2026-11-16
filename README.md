@@ -55,6 +55,14 @@ algebra a 48-grid model needs.
 Parity is checked against the gfortran listings in `tests/golden/` (regenerate with
 `scripts/make_golden.sh`). A value matches when it is within 1e-5 relative, one unit in
 the last printed digit, or 1e-6 of the table's largest magnitude (round-off zeros).
+Element forces and stresses also get the spread that the Fortran's own single-precision
+recovery allows: SDR2 (e.g. `mis/srod2.f`) works in REAL*4 on a REAL*4 displacement
+vector, so for short, stiff elements such as the 0.8 in. CROD posts between the wing
+skins, the force is a small difference of two large, nearly equal displacements and the
+Fortran only knows it to a few digits. `nastran95py/parity.py` propagates each
+displacement's uncertainty (half its last printed digit or 2^-24 of its value, plus any
+Python-vs-Fortran difference) through the linear recovery; for long CONRODs this stays
+under 1e-6 relative, so a 0.1% error in a recovered force still fails.
 
 ```bash
 python3 -m pytest tests
