@@ -1,0 +1,7 @@
+build/
+out/
+bin/nastran.exe
+bin/chkfil
+__pycache__/
+*.pyc
+.pytest_cache/
