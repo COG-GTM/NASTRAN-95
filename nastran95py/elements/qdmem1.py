@@ -70,6 +70,9 @@ def _geometry(model, elem, dt=np.float64):
     g["y34"] = g["y3a"] - g["y4a"]
     if g["y3a"] <= 0.0 or g["y4a"] <= 0.0:
         raise ValueError(f"CQDMEM1 {elem.id}: bad geometry (qdmm1d.f error 26)")
+    if (g["x13"] >= (g["y3a"] / g["y4a"]) * g["x14"]
+            or g["x14"] <= g["x12"] + g["x23"] * (g["y4a"] / g["y3a"])):
+        raise ValueError(f"CQDMEM1 {elem.id}: internal angle greater than 180 degrees")
     temp = np.linalg.norm(d31)
     ysub4 = np.linalg.norm(d42)
     g["planar"] = 2.0 * hh / (temp + ysub4) <= 1.0e-6
