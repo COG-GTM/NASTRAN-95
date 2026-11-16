@@ -19,14 +19,23 @@ def tables_in_scope(golden):
     return [t for t in golden if t in (DISPLACEMENT, SPCFORCE) or IN_SCOPE.search(t)]
 
 
+NOISY = 1e-2
+
+
 def _tolerance(model, golden, result):
-    disp = {g: np.array([v for v, _ in row]) for g, row in golden[DISPLACEMENT].items()}
-    du = parity.displacement_uncertainty(golden, result.disp)
-    for g, u in result.disp.items():  # grids the deck does not print: Python values, f32 rounding
-        if g not in disp:
-            disp[g] = np.asarray(u, dtype=float)
-            du[g] = parity.F32_EPS * np.abs(disp[g])
+    """The Fortran solves in double precision (SSG3) and recovers from the REAL*4 rounding of
+    that solution, which the Python solve reproduces (the displacement table checks it), so
+    each component is uncertain by 2**-24 of its value."""
+    disp = {g: np.asarray(u, dtype=float) for g, u in result.disp.items()}
+    du = {g: parity.F32_EPS * np.abs(u) for g, u in disp.items()}
     return parity.recovery_tolerance(model, disp, du)
+
+
+def noisy_values(golden, tol, title):
+    """Printed values whose REAL*4 recovery spread exceeds NOISY of their size: the 1995
+    Fortran itself only knows these to a digit or two, so parity on them is weak."""
+    return sum(1 for i, row in tol.get(title, {}).items()
+               for t, (g, _) in zip(row, golden[title].get(i, [])) if t > NOISY * abs(g))
 
 
 def parity_problems(model, golden, result, titles=None):
@@ -45,7 +54,9 @@ def main(argv):
     for title in tables_in_scope(golden):
         problems = parity.compare(golden, result.tables, [title], tol)
         n = sum(len(row) for row in golden[title].values())
-        print(f"{'PASS' if not problems else 'FAIL'}  {title:<52} {n:5d} values")
+        noisy = noisy_values(golden, tol, title)
+        note = f"  ({noisy} REAL*4-noise-limited)" if noisy else ""
+        print(f"{'PASS' if not problems else 'FAIL'}  {title:<52} {n:5d} values{note}")
         for p in problems[:3]:
             print("      ", p)
         failed += bool(problems)

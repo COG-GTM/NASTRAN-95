@@ -56,13 +56,16 @@ Parity is checked against the gfortran listings in `tests/golden/` (regenerate w
 `scripts/make_golden.sh`). A value matches when it is within 1e-5 relative, one unit in
 the last printed digit, or 1e-6 of the table's largest magnitude (round-off zeros).
 Element forces and stresses also get the spread that the Fortran's own single-precision
-recovery allows: SDR2 (e.g. `mis/srod2.f`) works in REAL*4 on a REAL*4 displacement
-vector, so for short, stiff elements such as the 0.8 in. CROD posts between the wing
-skins, the force is a small difference of two large, nearly equal displacements and the
-Fortran only knows it to a few digits. `nastran95py/parity.py` propagates each
-displacement's uncertainty (half its last printed digit or 2^-24 of its value, plus any
-Python-vs-Fortran difference) through the linear recovery; for long CONRODs this stays
-under 1e-6 relative, so a 0.1% error in a recovered force still fails.
+recovery allows: SSG3 solves in double precision, but SDR2 (e.g. `mis/srod2.f`) works in
+REAL*4 on the REAL*4 rounding of that solution. `nastran95py/parity.py` propagates a
+2^-24 relative error in each displacement through the linear recovery (the per-element
+tests, which start from the printed displacements, use half the last printed digit
+instead). For most elements this stays below 1e-4 relative, so a 0.1% error still fails.
+It does not for the 0.8 in. CROD posts between the wing skins and a few near-zero shear
+panel forces: there the force is a small difference of two large, nearly equal
+displacements, and the 1995 Fortran's printed value is itself mostly REAL*4 noise.
+`parity_run` counts those values on each table line as "REAL*4-noise-limited"; parity on
+them is weak by construction, not evidence that the port is right.
 
 ```bash
 python3 -m pytest tests
