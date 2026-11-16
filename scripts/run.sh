@@ -5,6 +5,7 @@
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$(mkdir -p "${OUT_DIR:-$ROOT/out}" && cd "${OUT_DIR:-$ROOT/out}" && pwd)"
+INP_DIR="$(cd "${INP_DIR:-$ROOT/inp}" && pwd)"
 EXE="${NASTRAN_EXE:-$ROOT/bin/nastran.exe}"
 [ -n "${NASTRAN_EXE:-}" ] || make -C "$ROOT" -j"$(nproc)" >/dev/null || exit 2
 rc_all=0
@@ -21,7 +22,7 @@ for name in "$@"; do
         FTN11=ftn11 FTN12=ftn12 FTN13=ftn13 FTN14=ftn14 FTN15=ftn15 FTN16=ftn16 FTN17=ftn17 \
         FTN18=ftn18 FTN19=ftn19 FTN20=ftn20 FTN21=ftn21 FTN22=ftn22 FTN23=ftn23 \
         DBMEM=12000000 OCMEM=2000000 \
-        timeout "${NASTRAN_TIMEOUT:-300}" "$EXE" < <(tr -d '\r\032' < "$ROOT/inp/$name.inp") > "$OUT_DIR/$name.out"
+        timeout "${NASTRAN_TIMEOUT:-300}" "$EXE" < <(tr -d '\r\032' < "$INP_DIR/$name.inp") > "$OUT_DIR/$name.out"
     rc=$?
     [ -s log ] && cp log "$OUT_DIR/$name.log"
     [ -s pch ] && cp pch "$OUT_DIR/$name.pch"
