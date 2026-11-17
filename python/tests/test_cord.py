@@ -214,6 +214,14 @@ def test_cords_and_grids_from_cards():
     np.testing.assert_allclose(cstm[2].t, [[0, -1, 0], [1, 0, 0], [0, 0, 1]], atol=1e-15)
 
 
+def test_grdset_default_cp():
+    text = DECK.replace("GRID    1 ", "GRDSET          4\nGRID    1 ").replace(
+        "GRID    2               0.0", "GRID    2       0       0.0"
+    )
+    grids = {g.gid: g for g in grids_from_cards(read_deck(text).bulk)}
+    assert [grids[i].cp for i in range(1, 7)] == [4, 0, 4, 4, 4, 4]
+
+
 def _decks_with_cords():
     root = repo_root()
     out = []

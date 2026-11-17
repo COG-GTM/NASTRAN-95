@@ -243,10 +243,19 @@ def cords_from_cards(cards: Iterable[Any]) -> list[Cord]:
 
 
 def grids_from_cards(cards: Iterable[Any]) -> list[Grid]:
-    """GRID locations (``ID, CP, X1, X2, X3``) from parsed bulk data cards."""
+    """GRID locations (``ID, CP, X1, X2, X3``) from parsed bulk data cards.
+
+    A blank GRID CP takes the CP of the deck's GRDSET card, as in IFS1P.
+    """
+    cards = list(cards)
+    default_cp = 0
+    for card in cards:
+        if card.name.upper() == "GRDSET":
+            default_cp = _int((list(card.fields) + [None] * 2)[1])
     out: list[Grid] = []
     for card in cards:
         if card.name.upper() == "GRID":
             f = list(card.fields) + [None] * 5
-            out.append(Grid(_int(f[0]), _int(f[1]), (_num(f[2]), _num(f[3]), _num(f[4]))))
+            cp = default_cp if f[1] is None else _int(f[1])
+            out.append(Grid(_int(f[0]), cp, (_num(f[2]), _num(f[3]), _num(f[4]))))
     return out
