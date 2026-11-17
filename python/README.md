@@ -103,3 +103,8 @@ temperature, zero stress) and regenerates `golden/trmem_stress_golden.json`, use
 by `tests/test_trmem_stress.py` with the STRME cases of `harness_golden.json` and
 the "STRESSES IN TRIANGULAR MEMBRANES" tables of the listings (d01011a, d01012a,
 d01013a, d01014a, d01161a).
+
+`python -m tests.fortran_harness.shear_stress_cases` regenerates the SDR2
+`SPANL1`/`SPANL2` cases (the same panels with general displacements, a material
+with a shear allowable for the margin of safety) in
+`golden/shear_stress_golden.json`, used by `tests/test_shear_stress.py`.
