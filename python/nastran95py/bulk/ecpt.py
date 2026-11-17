@@ -13,11 +13,13 @@ temperatures of that set (TEMP, falling back to the set's TEMPD default).
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import re
 from dataclasses import dataclass
 
 from nastran95py.bulk.model import PROPERTY_FOR, BulkDataError, BulkModel, Connection
 from nastran95py.elements.contract import CARD_LAYOUTS, LAYOUTS, ElementData, GridPoint
+
+_TEMPERATURE = re.compile(r"^\s*TEMP[A-Z]*\s*(?:\(([^)]*)\))?\s*=\s*(\d+)\s*$")
 
 
 @dataclass(frozen=True)
@@ -42,19 +44,19 @@ class EcptRecord:
         return LAYOUTS[self.element].pack(self.data, raw=raw)
 
 
-def material_temperature_set(case_control: Mapping) -> int | None:
-    """TEMPERATURE(MATERIAL|BOTH) set id from parsed case control, or ``None``.
+def material_temperature_set(case_control: list[str]) -> int | None:
+    """TEMPERATURE(MATERIAL|BOTH) set id from case control lines, or ``None``.
 
-    The material temperature set is problem-wide in the Fortran (``KSYSTM(10)``),
-    so subcases that select different sets are rejected.
+    TEMPERATURE(LOAD) selections are ignored. The material temperature set is
+    problem-wide in the Fortran (``KSYSTM(10)``), so different sets are rejected.
     """
     sets = set()
-    for sc in case_control.get("subcases", []):
-        sel = sc.get("selectors", {}).get("TEMPERATURE")
-        if sel and sel.get("type", "BOTH").upper().startswith(("MAT", "BOTH")):
-            sets.add(int(sel["set"]))
+    for raw in case_control:
+        m = _TEMPERATURE.match(raw.split("$", 1)[0].upper())
+        if m and (m.group(1) or "BOTH").strip().startswith(("MAT", "BOTH")):
+            sets.add(int(m.group(2)))
     if len(sets) > 1:
-        raise BulkDataError(f"subcases select different material temperature sets {sorted(sets)}")
+        raise BulkDataError(f"case control selects material temperature sets {sorted(sets)}")
     return sets.pop() if sets else None
 
 
@@ -114,9 +116,8 @@ def build_ecpts(model: BulkModel, temp_set: int | None = None) -> dict[str, list
 def read_ecpts(text: str) -> tuple[BulkModel, dict[str, list[EcptRecord]]]:
     """Read a whole deck: bulk model plus ECPT records at its material temperature set."""
     from nastran95py.reference.cards import read_deck
-    from nastran95py.reference.casecontrol import parse_case_control
 
     deck = read_deck(text)
     model = BulkModel.from_deck(deck)
-    temp_set = material_temperature_set(parse_case_control(deck.case_control))
+    temp_set = material_temperature_set(deck.case_control)
     return model, build_ecpts(model, temp_set)

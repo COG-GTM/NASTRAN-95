@@ -1,7 +1,15 @@
 import numpy as np
 import pytest
 
-from nastran95py.bulk import BulkDataError, BulkModel, build_ecpt, build_ecpts, point_to_basic
+from nastran95py.bulk import (
+    BulkDataError,
+    BulkModel,
+    build_ecpt,
+    build_ecpts,
+    material_temperature_set,
+    point_to_basic,
+    read_ecpts,
+)
 from nastran95py.coords import CoordType, transform_to_basic
 from nastran95py.elements import LAYOUTS
 from nastran95py.reference.cards import read_deck
@@ -237,3 +245,31 @@ def test_missing_temperature_set():
 def test_unsupported_cards_are_counted():
     deck = read_deck(bulk("PARAM   GRDPNT  0", "GRID    1               0.      0.      0."))
     assert BulkModel.from_deck(deck).ignored == {"PARAM": 1}
+
+
+@pytest.mark.parametrize(
+    ("lines", "expected"),
+    [
+        (["TEMPERATURE(MATERIAL) = 3", "SUBCASE 1", "  TEMPERATURE(LOAD) = 7"], 3),
+        (["TEMP(MATERIALS) = 3000"], 3000),
+        (["SUBCASE 1", "TEMPERATURE = 1 $ both"], 1),
+        (["SUBCASE 1", "TEMP(LOAD) = 1"], None),
+        ([], None),
+    ],
+)
+def test_material_temperature_set(lines, expected):
+    assert material_temperature_set(lines) == expected
+
+
+def test_material_temperature_set_conflict():
+    with pytest.raises(BulkDataError, match="sets"):
+        material_temperature_set(["SUBCASE 1", "TEMP = 1", "SUBCASE 2", "TEMP = 2"])
+
+
+def test_read_ecpts_keeps_material_set_with_load_set():
+    text = (
+        "ID T,T\nCEND\nTEMPERATURE(MATERIAL) = 8\nSUBCASE 1\nTEMPERATURE(LOAD) = 9\n"
+        "BEGIN BULK\n" + "\n".join(QUAD) + "\nTEMPD   8       40.\nTEMPD   9       99.\nENDDATA\n"
+    )
+    _, ecpts = read_ecpts(text)
+    assert ecpts["QDMEM1"][0].data.temperature == 40.0
