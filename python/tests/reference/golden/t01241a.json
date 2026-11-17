@@ -1,0 +1,41 @@
+{
+ "schema": 1,
+ "deck": "t01241a",
+ "listing": "demoout/t01241a.out",
+ "listing_sha256": "e3790e320c393dc838f32ae526108c538b1b951fabc9678cf9509e9b1b1aa855",
+ "source": "parsed from the COSMIC listing by nastran95py.reference.golden",
+ "tolerance": {
+  "rtol": 0.0001,
+  "atol_scale": 0.0001,
+  "atol": "atol_scale * max|golden| of the column (whole table if the column is all zero)",
+  "rtol_overrides": {
+   "margin": 0.05,
+   "axial_margin": 0.05,
+   "torsional_margin": 0.05
+  }
+ },
+ "subcases": [1],
+ "tables": [],
+ "matrices": [
+  {
+   "name": "KGGX",
+   "type": "D.P.REAL",
+   "cols": 24,
+   "rows": 24,
+   "form": "SYMMETRC",
+   "line": 188,
+   "entries": [
+    [1, 1, 2184000.0],
+    [7, 1, -2184000.0],
+    [1, 7, -2184000.0],
+    [7, 7, 3276000.0],
+    [13, 7, -1092000.0],
+    [7, 13, -1092000.0],
+    [13, 13, 2184000.0],
+    [19, 13, -1092000.0],
+    [13, 19, -1092000.0],
+    [19, 19, 1092000.0]
+   ]
+  }
+ ]
+}
