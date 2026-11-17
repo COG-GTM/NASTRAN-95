@@ -74,12 +74,16 @@ def real_word_as_int(x: float) -> int:
     return struct.unpack("<i", struct.pack("<f", x))[0]
 
 
-def stdin_for(cases: list[C.Case]) -> str:
+def stdin_for(cases: list[C.Case], cstm: list = ()) -> str:
+    """Harness input; ``cstm`` holds ``(cid, type, 12 REAL words)`` CSTM records."""
     lines = [str(len(C.MAT1))]
     lines += [" ".join([str(mid)] + [repr(float(v)) for v in vals]) for mid, vals in C.MAT1]
     lines.append(str(len(C.MAT2)))
     lines += [" ".join([str(mid)] + [repr(float(v)) for v in vals]) for mid, vals in C.MAT2]
-    lines.append("0")
+    lines.append(str(len(cstm)))
+    lines += [
+        f"{cid} {ctype} " + " ".join(repr(float(v)) for v in vals) for cid, ctype, vals in cstm
+    ]
     lines.append(str(len(cases)))
     for case in cases:
         lines.append(f"{case.kind} {case.routine} {len(case.words)}")
@@ -145,10 +149,12 @@ def parse(text: str, cases: list[C.Case]) -> list[CaseResult]:
     return results
 
 
-def run(cases: list[C.Case] | None = None, binary: Path = BINARY) -> list[CaseResult]:
+def run(
+    cases: list[C.Case] | None = None, binary: Path = BINARY, cstm: list = ()
+) -> list[CaseResult]:
     cases = C.ALL_CASES if cases is None else cases
     out = subprocess.run(
-        [str(binary)], input=stdin_for(cases), capture_output=True, text=True, check=True
+        [str(binary)], input=stdin_for(cases, cstm), capture_output=True, text=True, check=True
     )
     results = parse(out.stdout, cases)
     if len(results) != len(cases):
