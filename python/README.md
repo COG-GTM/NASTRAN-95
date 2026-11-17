@@ -90,3 +90,9 @@ regenerates `golden/rod_load_golden.json`, used by `tests/test_rod_loads.py`.
 `python -m tests.fortran_harness.shear_cases` regenerates the SHEARD cases
 (every flexibility branch, warped/skewed/CSTM panels, and the MESAGE 2026/2027
 exits) in `golden/shear_golden.json`, used by `tests/test_shear.py`.
+
+`python -m tests.fortran_harness.rod_stress_cases` reruns the `srod1`/`srod2`
+rod stress recovery cases (coordinate systems, MAT1 limits, load temperature,
+`DEFORM`) and regenerates `golden/rod_stress_golden.json`, used by
+`tests/test_rod_stress.py` with the SROD cases of `harness_golden.json` and the
+rod stress/force tables of the listings (d01161a, d01013a).
