@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import math
+import threading
+
 import pytest
 
 from nastran95py.materials import (
@@ -128,3 +131,53 @@ def test_matt1_validation():
     with pytest.raises(MaterialError, match="duplicate TABLEM"):
         MaterialTable([mat1], tables=[t, t])
     assert Matt1(1, e=10, ss=10).table_ids() == {"e": 10, "ss": 10}
+
+
+def _run_bounded(fn, seconds=5.0):
+    result: list[BaseException | float] = []
+
+    def target():
+        try:
+            result.append(fn())
+        except BaseException as exc:
+            result.append(exc)
+
+    worker = threading.Thread(target=target, daemon=True)
+    worker.start()
+    worker.join(seconds)
+    assert not worker.is_alive(), "look-up did not terminate"
+    return result[0]
+
+
+@pytest.mark.parametrize("temp", [math.nan, math.inf, -math.inf])
+@pytest.mark.parametrize(
+    "table",
+    [
+        TableM1(7, (1.0, 10.0), (5.0, 6.0)),
+        TableM1(7, (1.0, 2.0, 3.0, 4.0), (5.0, 6.0, 7.0, 8.0)),
+        TableM2(7, 1.0, (0.0, 10.0), (1.0, 2.0)),
+        TableM3(7, 1.0, 2.0, (0.0, 10.0), (1.0, 2.0)),
+        TableM4(7, 0.0, 1.0, -1.0, 1.0, (1.0, 2.0)),
+    ],
+)
+def test_non_finite_temperature_is_rejected(table, temp):
+    outcome = _run_bounded(lambda: table.evaluate(temp, 3.0))
+    assert isinstance(outcome, MaterialError)
+    assert "table 7" in str(outcome)
+
+
+@pytest.mark.parametrize("arg", [math.nan, math.inf])
+def test_interpolate_rejects_non_finite_argument(arg):
+    outcome = _run_bounded(lambda: interpolate((1.0, 10.0), (5.0, 6.0), arg))
+    assert isinstance(outcome, ValueError)
+
+
+def test_non_finite_temperature_through_material_table():
+    table = MaterialTable(
+        mat1=[Mat1(75, e=10.4e6, g=0.0, nu=0.3)],
+        matt1=[Matt1(75, e=100)],
+        tables=[D01032A_E],
+    )
+    outcome = _run_bounded(lambda: table.mat(75, 1, temp=math.nan))
+    assert isinstance(outcome, MaterialError)
+    assert "table 100" in str(outcome)

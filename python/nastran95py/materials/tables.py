@@ -18,6 +18,7 @@ and are not ported.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -26,6 +27,8 @@ from nastran95py.materials.mat import MaterialError
 
 def interpolate(x: Sequence[float], y: Sequence[float], arg: float) -> float:
     """Piecewise-linear look-up ``f(arg)`` exactly as ``premat.f`` statements 1080-1170."""
+    if not math.isfinite(arg):
+        raise ValueError(f"table look-up argument {arg!r} is not finite")
     n = len(x)
     up = -1.0 if x[0] > x[1] else 1.0
     if (arg - x[0]) * up <= 0.0:
@@ -66,6 +69,11 @@ def _on_point(x: Sequence[float], y: Sequence[float], k: int, arg: float) -> flo
     return y[k]
 
 
+def _check_temp(tid: int, temp: float) -> None:
+    if not math.isfinite(temp):
+        raise MaterialError(f"table {tid}: temperature {temp!r} is not finite")
+
+
 def _check_points(tid: int, x: Sequence[float], y: Sequence[float]) -> None:
     if len(x) != len(y):
         raise MaterialError(f"table {tid}: {len(x)} abscissae but {len(y)} ordinates")
@@ -93,6 +101,7 @@ class TableM1:
         _check_points(self.tid, self.x, self.y)
 
     def evaluate(self, temp: float, base: float) -> float:
+        _check_temp(self.tid, temp)
         return interpolate(self.x, self.y, temp)
 
 
@@ -112,6 +121,7 @@ class TableM2:
         _check_points(self.tid, self.x, self.y)
 
     def evaluate(self, temp: float, base: float) -> float:
+        _check_temp(self.tid, temp)
         return base * interpolate(self.x, self.y, temp - self.x1)
 
 
@@ -134,6 +144,7 @@ class TableM3:
         _check_points(self.tid, self.x, self.y)
 
     def evaluate(self, temp: float, base: float) -> float:
+        _check_temp(self.tid, temp)
         return base * interpolate(self.x, self.y, (temp - self.x1) / self.x2)
 
 
@@ -164,6 +175,7 @@ class TableM4:
         return p
 
     def evaluate(self, temp: float, base: float) -> float:
+        _check_temp(self.tid, temp)
         x = (temp - self.x1) / self.x2
         lo = (self.x3 - self.x1) / self.x2
         hi = (self.x4 - self.x1) / self.x2
