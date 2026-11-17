@@ -62,9 +62,9 @@ class MeanPlane:
     def lengths(self) -> tuple[Array, Array, Array, Array]:
         """Side lengths ``LA, LB, LC, LD`` in the mean plane."""
         la = np.abs(self.x12)
-        lb = np.sqrt(self.x23**2 + self.y3a**2)
-        lc = np.sqrt(self.x34**2 + self.y34**2)
-        ld = np.sqrt(self.x14**2 + self.y4a**2)
+        lb = np.sqrt(self.x23 * self.x23 + self.y3a * self.y3a)
+        lc = np.sqrt(self.x34 * self.x34 + self.y34 * self.y34)
+        ld = np.sqrt(self.x14 * self.x14 + self.y4a * self.y4a)
         return la, lb, lc, ld
 
 
@@ -93,19 +93,19 @@ def mean_plane(
         pk1 = y31 * z42 - z31 * y42
         pk2 = z31 * x42 - x31 * z42
         pk3 = x31 * y42 - y31 * x42
-        magk = np.sqrt(pk1**2 + pk2**2 + pk3**2)
+        magk = np.sqrt(pk1 * pk1 + pk2 * pk2 + pk3 * pk3)
         pk1, pk2, pk3 = pk1 / magk, pk2 / magk, pk3 / magk
         hh = x21 * pk1 + y21 * pk2 + z21 * pk3
         pi1 = x21 - hh * pk1
         pi2 = y21 - hh * pk2
         pi3 = z21 - hh * pk3
-        magi = np.sqrt(pi1**2 + pi2**2 + pi3**2)
+        magi = np.sqrt(pi1 * pi1 + pi2 * pi2 + pi3 * pi3)
         pi1, pi2, pi3 = pi1 / magi, pi2 / magi, pi3 / magi
         hh = -hh / dtype(2.0)
         pj1 = pk2 * pi3 - pk3 * pi2
         pj2 = pk3 * pi1 - pk1 * pi3
         pj3 = pk1 * pi2 - pk2 * pi1
-        magj = np.sqrt(pj1**2 + pj2**2 + pj3**2)
+        magj = np.sqrt(pj1 * pj1 + pj2 * pj2 + pj3 * pj3)
         pj1, pj2, pj3 = pj1 / magj, pj2 / magj, pj3 / magj
     e = np.stack(
         [
@@ -140,8 +140,8 @@ def mean_plane(
         magk=magk,
         magi=magi,
         magj=magj,
-        diag13=np.sqrt(x31**2 + y31**2 + z31**2),
-        diag24=np.sqrt(x42**2 + y42**2 + z42**2),
+        diag13=np.sqrt(x31 * x31 + y31 * y31 + z31 * z31),
+        diag24=np.sqrt(x42 * x42 + y42 * y42 + z42 * z42),
     )
 
 

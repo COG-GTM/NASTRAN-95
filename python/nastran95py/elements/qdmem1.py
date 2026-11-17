@@ -73,7 +73,8 @@ Materials = MaterialTable | Sequence[TrmemProperties]
 ETA01 = (0.211324865, 0.788675135)
 """Gauss points on ``[0, 1]`` as ``QDMM1D`` stores them."""
 _F32 = np.float32
-S4PISQ32 = _F32(4.0) * (_F32(4.0) * _F32(math.atan(1.0))) ** 2
+_PI32 = _F32(_F32(4.0) * _F32(math.atan(1.0)))
+S4PISQ32 = _F32(_F32(4.0) * _F32(_PI32 * _PI32))
 """``CONSTS(5)`` (4 pi^2) as REAL: the factor ``QDMM1D``/``QDMM1S`` multiply THETA by."""
 PHI_SCALE = 28.6478898
 """Half of 180/pi as ``SQDM12`` writes it: ``PHI = ATAN2(2 TXY, SX - SY) * PHI_SCALE``."""
@@ -190,13 +191,13 @@ def _transs32(cs: CoordSystem, xyz) -> np.ndarray:
         return ke
     xn = np.asarray(xyz, f32) - cs.origin.astype(f32)
     x, y, z = (ke[0, c] * xn[0] + ke[1, c] * xn[1] + ke[2, c] * xn[2] for c in range(3))
-    r = np.sqrt(x**2 + y**2)
+    r = np.sqrt(x * x + y * y)
     if r == f32(0.0):
         return ke
     if cs.ctype == CoordType.CYLINDRICAL:
         tl = np.array([[x / r, -y / r, 0.0], [y / r, x / r, 0.0], [0.0, 0.0, 1.0]], f32)
     else:
-        xl = np.sqrt(x**2 + y**2 + z**2)
+        xl = np.sqrt(x * x + y * y + z * z)
         tl = np.array(
             [
                 [x / xl, (x * z) / (r * xl), -y / r],
@@ -574,7 +575,7 @@ def diagonal_intersection(mp: MeanPlane, i: int = 0) -> tuple[float, float]:
             if abs(a2) <= tol2:
                 etas = (-x12 * ystar) / b2
             else:
-                temp2 = np.sqrt(b2**2 - (four * a2 * x12 * ystar)) / (two * a2)
+                temp2 = np.sqrt(b2 * b2 - (four * a2 * x12 * ystar)) / (two * a2)
                 temp1 = -b2 / (two * a2)
                 etas = temp1 - temp2
                 if etas <= zero or etas >= one:
@@ -589,7 +590,7 @@ def diagonal_intersection(mp: MeanPlane, i: int = 0) -> tuple[float, float]:
             if abs(a3) <= tol2:
                 etas = (x12 * ystar) / b3
             else:
-                temp2 = np.sqrt(b3**2 + (four * a3 * x12 * ystar)) / (two * a3)
+                temp2 = np.sqrt(b3 * b3 + (four * a3 * x12 * ystar)) / (two * a3)
                 temp1 = -b3 / (two * a3)
                 etas = temp1 - temp2
                 if etas <= zero or etas >= one:
@@ -727,7 +728,8 @@ def sqdm12(
     sx, sy, sxy = stress
     two = dt(2.0)
     temp = sx - sy
-    tau = np.sqrt((temp / two) ** 2 + sxy**2)
+    half = temp / two
+    tau = dt(np.sqrt(dt(half * half + sxy * sxy)))
     delta = (sx + sy) / two
     major, minor = delta + tau, delta - tau
     delta = two * sxy
