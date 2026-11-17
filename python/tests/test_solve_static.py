@@ -206,6 +206,48 @@ def test_enforced_spc_displacement():
     assert res.spc_force[sil[4] - 1] == pytest.approx(force, rel=1e-9)
 
 
+_ROD = """ID    SOLVE,TEST
+APP   DISPLACEMENT
+SOL   1,1
+TIME  5
+CEND
+SPC = 1
+LOAD = 1
+BEGIN BULK
+GRDSET,,,,,,,3456
+GRID,1,,0.,0.,0.
+GRID,2,,2.,3.,0.
+MAT1,1,1.+7,,.3
+CROD,5,15,1,2
+PROD,15,1,.2
+SPC1,1,12,1
+FORCE,1,2,,1.,0.,1.,0.
+{extra}
+ENDDATA
+"""
+
+
+def test_diagonal_rod_mechanism_is_detected():
+    # Grid 2 has only the rod's axial stiffness along (2, 3): K_ff is rank 1, but its
+    # float32 assembly leaves a tiny nonzero pivot that a residual test accepts.
+    with pytest.raises(SingularStiffness, match=r"mechanism\) at .*\[\(2, [12]\)\]"):
+        solve_static(_ROD.format(extra=""))
+    # Supporting grid 2 across the rod (SPC on T1) makes it determinate again.
+    res = solve_static(_ROD.format(extra="SPC1,1,1,2")).subcases[1]
+    axial = 1.0e7 * 0.2 / np.sqrt(13.0)
+    # Load (0, 1) with T1 fixed: rod force N = 1 / sin, u_axial = N / k, u2 = u_axial / sin.
+    sin = 3.0 / np.sqrt(13.0)
+    assert res.displacement[7] == pytest.approx(1.0 / sin / axial / sin, rel=1e-6)
+
+
+def test_floating_rod_pair_mechanism_is_detected():
+    # Grids 3-4 are joined by an X rod only: K_ff = k [[1, -1], [-1, 1]], an exactly
+    # zero pivot; both DOFs of the rigid-body mode are named.
+    extra = "GRID,3,,5.,0.,0.\nGRID,4,,7.,0.,0.\nCROD,6,15,3,4\nSPC1,1,1,2\nSPC1,1,2,3,4"
+    with pytest.raises(SingularStiffness, match=r"\(3, 1\), \(4, 1\)"):
+        solve_static(_ROD.format(extra=extra))
+
+
 # -- thermal loads through every element kernel ---------------------------------------
 
 _PLATE = """ID    SOLVE,TEST

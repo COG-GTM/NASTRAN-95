@@ -32,7 +32,7 @@ from pathlib import Path
 import numpy as np
 import scipy.sparse as sp
 from numpy.typing import NDArray
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import splu
 
 from nastran95py.bulk import (
     BulkDataError,
@@ -91,6 +91,13 @@ ACCEPTED_CARDS = frozenset({"PARAM", "CNGRNT", "POPT", "PLIMIT", "LOAD"})
 """Bulk cards the bulk reader leaves uninterpreted that the static solve accepts."""
 
 UNSUPPORTED_CASE_CONTROL = ("MPC", "DEFO", "SUBCOM", "SYMCOM", "REPCASE", "SYMSEQ")
+
+MAXRATIO = 1.0e7
+"""Largest accepted ``K_ii / D_ii`` (matrix diagonal over factor pivot) of a free DOF.
+
+Like the MAXRATIO diagnostic of the NASTRAN decomposition: a larger ratio (or a
+non-positive pivot) means the DOF is part of a mechanism. The RF1 reference decks
+stay below 5e3."""
 
 
 class NotSupported(NotImplementedError):
@@ -457,6 +464,49 @@ def _point_component(sm: StaticModel, i: int) -> tuple[int, int]:
     return p, (i - (s - 1) + 1) if p in sm.model.grids else 0
 
 
+def _mechanism_dofs(kff: sp.csc_matrix, limit: int = 4000) -> NDArray[np.int64]:
+    """Free DOFs of the near-null modes of the diagonally scaled ``K_ff`` (dense, small models)."""
+    if kff.shape[0] > limit:
+        return np.zeros(0, np.int64)
+    d = 1.0 / np.sqrt(kff.diagonal())
+    w, v = np.linalg.eigh(d[:, None] * kff.toarray() * d[None, :])
+    modes = v[:, w < w.max() / MAXRATIO]
+    if not modes.size:
+        return np.zeros(0, np.int64)
+    weight = np.abs(modes).max(axis=1)
+    return np.flatnonzero(weight > 0.1 * weight.max())
+
+
+def _factor(sm: StaticModel, kff: sp.csc_matrix, free: NDArray[np.int64], subcase: int):
+    """Sparse LU of ``K_ff`` with diagonal pivots; raise :class:`SingularStiffness` on mechanisms.
+
+    With ``diag_pivot_thresh=0`` and a symmetric ordering, pivot ``k`` of ``U``
+    belongs to the free DOF ``i`` with ``perm_c[i] == k``, so each pivot can be
+    compared with its own diagonal term.
+    """
+    try:
+        lu = splu(
+            kff,
+            permc_spec="MMD_AT_PLUS_A",
+            diag_pivot_thresh=0.0,
+            options={"SymmetricMode": True},
+        )
+    except RuntimeError:  # an exactly zero pivot
+        bad = _mechanism_dofs(kff)
+    else:
+        pivots = lu.U.diagonal()[lu.perm_c]
+        diag = kff.diagonal()
+        with np.errstate(divide="ignore"):
+            ratio = diag / np.abs(pivots)
+        bad = np.flatnonzero((pivots <= 0.0) | ~(ratio <= MAXRATIO))
+        if not bad.size:
+            return lu
+    where = [_point_component(sm, int(free[i])) for i in bad]
+    raise SingularStiffness(
+        f"subcase {subcase}: K_ff is singular (mechanism) at (point, component) {where}"
+    )
+
+
 def _solve_subcase(sm: StaticModel, k: sp.csr_matrix, subcase: dict) -> SubcaseResult:
     n = sm.ndof
     sel = subcase["selectors"]
@@ -481,15 +531,9 @@ def _solve_subcase(sm: StaticModel, k: sp.csr_matrix, subcase: dict) -> SubcaseR
     free = np.flatnonzero(~fixed)
     if free.size:
         kc = k.tocsc()
-        kff = kc[free][:, free]
+        kff = kc[free][:, free].tocsc()
         rhs = p[free] - kc[free][:, np.flatnonzero(fixed)] @ u[fixed]
-        with np.errstate(all="ignore"):
-            uf = np.atleast_1d(spsolve(kff.tocsc(), rhs))
-        residual = kff @ uf - rhs
-        scale = max(np.abs(rhs).max(), np.abs(kff @ uf).max(), 1e-300)
-        if not np.isfinite(uf).all() or np.abs(residual).max() > 1e-6 * scale:
-            raise SingularStiffness(f"subcase {subcase['id']}: K_ff is singular (mechanism)")
-        u[free] = uf
+        u[free] = _factor(sm, kff, free, subcase["id"]).solve(rhs)
     q = k @ u - p
     q[~fixed] = 0.0
     stresses, forces = _recover(sm, u, temps)
