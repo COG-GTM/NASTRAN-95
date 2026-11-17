@@ -79,5 +79,5 @@ jobs:
         run: python -m pytest tests/test_qdmem2.py
       - name: Pytest (material temperature selection)
         run: python -m pytest tests/test_material_temperature.py
-      - name: Pytest (RF1 static solve)
+      - name: Pytest (RF1 reference-deck parity vs golden listings)
         run: python -m pytest tests/test_solve_static.py

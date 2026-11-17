@@ -1,23 +1,30 @@
-"""``nastran95py.solve.static``: RF1 static solve smoke parity against the listings.
+"""``nastran95py.solve.static``: RF1 static solve parity against the golden listings.
 
-- t01241a: the assembled ``K_gg`` against the printed KGGX (the deck's DMAP ALTER
-  stops before the solve; its only load sits on a DOF with no stiffness).
-- d01011a: displacements, SPC forces and element stresses (one subcase).
-- d01161a: displacements of both subcases and the subcase 10 stresses (the
-  as-input analysis, first fully stressed design occurrence).
-- d01032a: OLOAD and displacements of a TEMP-driven thermal subcase.
+Every table of every inventoried RF1 deck (``tests/reference/golden/``) is solved
+and compared at the baseline tolerance (rtol 1e-4, atol 1e-4*max|column|, 5e-2 for
+margins of safety): displacements, SPC forces, OLOAD, element forces and stresses.
+A failure lists deck, subcase, grid/element id and component of every bad value.
 
-The full nine-deck comparison is a separate suite.
+- t01241a: no solution tables (its DMAP ALTER stops before the solve); the
+  assembled ``K_gg`` is checked against the printed KGGX and the solve must raise
+  ``SingularStiffness`` for the load on the unstiffened DOF (4, 3).
+- d01161a: only the as-input analysis (fully stressed design occurrence 1); the
+  resized-design occurrences 2 and 3 are out of scope.
+- d01013a: six CROD post axial forces are one SROD2 REAL rounding step off and are
+  strict xfails at the baseline tolerance, plus an exact one-step check (see
+  ``D01013A_QUANTUM_ROWS``).
 """
 
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 import numpy as np
 import pytest
 
-from nastran95py.reference.golden import compare, load_golden, tables
+from nastran95py.elements.rod_stress import rod_stress_matrices, rod_stresses
+from nastran95py.reference.golden import compare, load_golden, tables, tolerances
 from nastran95py.reference.inventory import repo_root
 from nastran95py.solve import (
     NotSupported,
@@ -45,33 +52,88 @@ def _with_case(text: str, *lines: str) -> str:
     return text.replace("CEND", "\n".join(["CEND", *lines]), 1)
 
 
-def _compare_listing(deck_id: str, solution, keys: list[str]) -> dict:
-    golden = tables(load_golden(deck_id))
-    out = {}
-    for key in keys:
-        table = golden[key]
-        kind, what, sc = key.split("/")[:3]
-        res = solution.subcases[int(sc[2:])]
-        if what == "grid":
-            vec = {"displacement": res.displacement, "spcforce": res.spc_force, "oload": res.load}
-            actual = res.grid_rows(vec[kind], table.ids)
-        else:
-            src = res.stresses if kind == "stress" else res.forces
-            actual = src[what].rows(int(e) for e in table.ids)
-        cmp = compare(table, actual)
-        assert cmp.n > 0 and cmp.failures == 0, (deck_id, key, cmp)
-        out[key] = cmp
+DECKS = (
+    "d01011a", "d01012a", "d01013a", "d01014a", "d01032a",
+    "d01033a", "d01034a", "d01161a", "t01241a",
+)  # fmt: skip
+"""Every RF1 deck in the reference manifest (``tests/reference/golden/``)."""
+
+KGGX_ONLY = {"t01241a"}
+"""Decks whose listing has no solution tables (t01241a's ALTER exits before SSG3)."""
+
+FIRST_OCCURRENCE_ONLY = {"d01161a"}
+"""d01161a prints three fully stressed design iterations; only the as-input
+analysis (``occ1``) is solved, POPT/PLIMIT resizing is out of scope."""
+
+# d01013a vertical CROD posts whose listed axial force is one REAL rounding
+# quantum away from ours. SROD2 forms SIGMA = TRANA + TRANB, two REAL dot products
+# SAT.u_a and SBT.u_b of about 1e6 that cancel to a few psi, so the printed force
+# moves in discrete REAL steps (0.525 lb for EID 63). Our
+# float64 displacements are solver-independent at float32 resolution (dense LU,
+# Cholesky and SuperLU with three orderings round to the same REAL vector; cond
+# K_ff = 5.9e5), yet each row is reproduced exactly by moving one end's u3 by one
+# float32 ulp (about 2e-8 relative, below the listing's 7 printed digits); for
+# EID 63 the listing itself prints grid 14 T3 as -7.825613E-02, one ulp below our
+# -7.825612E-02. Rounding every bulk REAL field to float32, and truncating instead
+# of rounding the displacements, were both tried and do not move these rows.
+D01013A_QUANTUM_ROWS = (63, 64, 65, 66, 77, 78)
+D01013A_POST_FORCES = "force/CROD/sc1/occ1"
+
+_SOLUTIONS: dict[str, object] = {}
+
+
+def _solution(deck_id: str):
+    if deck_id not in _SOLUTIONS:
+        _SOLUTIONS[deck_id] = solve_static(_deck(deck_id))
+    return _SOLUTIONS[deck_id]
+
+
+def _listing_keys(deck_id: str) -> list[str]:
+    keys = list(tables(load_golden(deck_id)))
+    if deck_id in FIRST_OCCURRENCE_ONLY:
+        keys = [k for k in keys if k.split("/")[3] == "occ1"]
+    return keys
+
+
+def _actual(deck_id: str, key: str, table) -> np.ndarray:
+    kind, what, sc = key.split("/")[:3]
+    res = _solution(deck_id).subcases[int(sc[2:])]
+    if what == "grid":
+        vec = {"displacement": res.displacement, "spcforce": res.spc_force, "oload": res.load}
+        return np.asarray(res.grid_rows(vec[kind], table.ids), dtype=float)
+    src = res.stresses if kind == "stress" else res.forces
+    return np.asarray(src[what].rows(int(e) for e in table.ids), dtype=float)
+
+
+def _mismatches(deck_id: str, table, actual: np.ndarray, skip=(), floor=None) -> list[str]:
+    """One line per out-of-tolerance value: deck, subcase, grid/element id, component."""
+    rtol, atol = tolerances(table)
+    if floor is not None:
+        atol = floor
+    g = table.values
+    err = np.abs(actual - g)
+    bad = ~np.isnan(g) & ~(err <= atol + rtol * np.abs(g))
+    what = table.meta["element_type"] or "grid"
+    out = []
+    for i, j in zip(*np.nonzero(bad), strict=True):
+        if int(table.ids[i]) in skip:
+            continue
+        out.append(
+            f"{deck_id} subcase {table.meta['subcase']} {table.meta['kind']} {what} "
+            f"{int(table.ids[i])} {table.columns[j]}: golden {g[i, j]:.7g} actual "
+            f"{actual[i, j]:.7g} (|err| {err[i, j]:.3g} > {atol[j] + rtol[j] * abs(g[i, j]):.3g})"
+        )
     return out
 
 
-def _record(label: str, cmps) -> None:
-    cmps = list(cmps)
-    record_parity(
-        label,
-        sum(c.n for c in cmps),
-        max(c.max_abs for c in cmps),
-        max(c.max_rel for c in cmps),
-    )
+def _without_rows(table, ids):
+    """``table`` with the rows of ``ids`` blanked (NaN) so ``compare`` skips them."""
+    vals = table.values.copy()
+    vals[np.isin(table.ids, list(ids))] = np.nan
+    return replace(table, values=vals)
+
+
+_LISTING_CASES = [(d, k) for d in DECKS if d not in KGGX_ONLY for k in _listing_keys(d)]
 
 
 # -- listing parity ------------------------------------------------------------------
@@ -101,37 +163,91 @@ def test_t01241a_load_on_unstiff_dof_is_rejected():
         solve_static(_deck("t01241a"))
 
 
-def test_d01011a_matches_listing():
-    keys = [
-        "displacement/grid/sc1/occ1",
-        "spcforce/grid/sc1/occ1",
-        "stress/CQDMEM/sc1/occ1",
-        "stress/CSHEAR/sc1/occ1",
-        "stress/CTRMEM/sc1/occ1",
-    ]
-    cmps = _compare_listing("d01011a", solve_static(_deck("d01011a")), keys)
-    _record("static d01011a displacements", [cmps[keys[0]]])
-    _record("static d01011a SPC forces", [cmps[keys[1]]])
-    _record("static d01011a stresses", [cmps[k] for k in keys[2:]])
+@pytest.mark.parametrize(
+    ("deck_id", "key"), _LISTING_CASES, ids=[f"{d}:{k}" for d, k in _LISTING_CASES]
+)
+def test_reference_deck_matches_golden(deck_id, key):
+    """Every golden table of every solvable RF1 deck at the baseline tolerance."""
+    table = tables(load_golden(deck_id))[key]
+    actual = _actual(deck_id, key, table)
+    skip = D01013A_QUANTUM_ROWS if (deck_id, key) == ("d01013a", D01013A_POST_FORCES) else ()
+    lines = _mismatches(deck_id, table, actual, skip)
+    assert not lines, "\n".join([f"{len(lines)} value(s) out of tolerance:", *lines])
+    cmp = compare(_without_rows(table, skip) if skip else table, actual)
+    assert cmp.n > 0 and cmp.failures == 0, cmp
+    record_parity(f"{deck_id} {key}", cmp.n, cmp.max_abs, cmp.max_rel)
 
 
-def test_d01161a_both_subcases_match_listing():
-    sol = solve_static(_deck("d01161a"))
-    assert sorted(sol.subcases) == [10, 12]
-    assert sol.model.material_set == 3000 and sol.model.thermal_sets == {10: None, 12: None}
-    disp = ["displacement/grid/sc10/occ1", "displacement/grid/sc12/occ1"]
-    stress = ["stress/CQDMEM/sc10/occ1", "stress/CROD/sc10/occ1", "stress/CTRMEM/sc10/occ1"]
-    cmps = _compare_listing("d01161a", sol, disp + stress)
-    _record("static d01161a displacements", [cmps[k] for k in disp])
-    _record("static d01161a stresses sc10", [cmps[k] for k in stress])
+def test_every_reference_deck_is_covered():
+    assert {d for d, _ in _LISTING_CASES} | KGGX_ONLY == set(DECKS)
+    assert {k.split("/")[0] for _, k in _LISTING_CASES} == {
+        "displacement", "spcforce", "oload", "force", "stress",
+    }  # fmt: skip
+    for d in set(DECKS) - KGGX_ONLY:
+        assert any(k.startswith("displacement/") for k in _listing_keys(d)), d
+    assert tables(load_golden("t01241a")) == {}
+    # d01161a: the resized-design occurrences 2 and 3 are parsed but not compared.
+    assert {k.split("/")[3] for k in tables(load_golden("d01161a"))} == {"occ1", "occ2", "occ3"}
+    assert {k.split("/")[3] for k in _listing_keys("d01161a")} == {"occ1"}
 
 
-def test_d01032a_thermal_subcase_matches_listing():
-    sol = solve_static(_deck("d01032a"))
-    assert sol.model.thermal_sets == {1: 1} and sol.model.material_set == 1
-    keys = ["oload/grid/sc1/occ1", "displacement/grid/sc1/occ1"]
-    cmps = _compare_listing("d01032a", sol, keys)
-    _record("static d01032a OLOAD+displacements", cmps.values())
+def _one_ulp_post_forces(deck_id: str, eids) -> dict[int, list[float]]:
+    """SROD2 axial forces after moving one end's T3 by one float32 ulp (4 per rod)."""
+    sol = _solution(deck_id)
+    sm = sol.model
+    batch = rod_stress_matrices(
+        [r.data for r in sm.ecpts["ROD"]], sm.model.materials, sm.model.cstm
+    )
+    u = sol.subcases[1].displacement
+    out: dict[int, list[float]] = {}
+    for i, eid in enumerate(batch.eid):
+        if int(eid) not in eids:
+            continue
+        out[int(eid)] = []
+        for sil in batch.sil[i]:
+            k = int(sil) + 1  # T3 of the end's first SIL
+            for toward in (-np.inf, np.inf):
+                up = u.copy()
+                up[k] = float(np.nextafter(np.float32(u[k]), np.float32(toward)))
+                out[int(eid)].append(float(rod_stresses(batch, up).force[i]))
+    return out
+
+
+_QUANTUM_XFAIL = pytest.mark.xfail(
+    strict=True,
+    reason="d01013a CROD post: SROD2 REAL cancellation of TRANA+TRANB moves the axial "
+    "force in REAL steps (|err| 0.027-1.75 lb, rel <= 7.7%); listing is one step "
+    "off, from a 1-ulp (~2e-8 rel) difference in one end's u3",
+)
+
+
+@pytest.mark.parametrize(
+    "eid", [pytest.param(e, marks=_QUANTUM_XFAIL) for e in D01013A_QUANTUM_ROWS]
+)
+def test_d01013a_post_axial_force_at_baseline_tolerance(eid):
+    table = tables(load_golden("d01013a"))[D01013A_POST_FORCES]
+    actual = _actual("d01013a", table.key, table)
+    sel = table.ids == eid
+    rows = replace(table, ids=table.ids[sel], values=table.values[sel])
+    lines = _mismatches("d01013a", rows, actual[sel], floor=tolerances(table)[1])
+    assert not lines, "\n".join(lines)
+
+
+def test_d01013a_post_axial_forces_are_one_real_quantum_off():
+    """The six rows the main suite skips are matched once one end's T3 moves 1 ulp."""
+    table = tables(load_golden("d01013a"))[D01013A_POST_FORCES]
+    actual = _actual("d01013a", table.key, table)
+    rtol, atol = tolerances(table)
+    nudged = _one_ulp_post_forces("d01013a", D01013A_QUANTUM_ROWS)
+    rows = [int(np.flatnonzero(table.ids == e)[0]) for e in D01013A_QUANTUM_ROWS]
+    for eid, i in zip(D01013A_QUANTUM_ROWS, rows, strict=True):
+        gold = table.values[i, 0]
+        hits = [f for f in nudged[eid] if abs(f - gold) <= atol[0] + rtol[0] * abs(gold)]
+        assert hits, (eid, gold, actual[i, 0], nudged[eid])
+        assert actual[i, 1] == table.values[i, 1] == 0.0
+    gold = table.values[rows, 0]
+    dev = np.abs(actual[rows, 0] - gold)
+    record_parity("d01013a CROD posts (1-ulp u3)", len(dev), dev.max(), (dev / np.abs(gold)).max())
 
 
 # -- loads and constraints -----------------------------------------------------------
