@@ -82,3 +82,14 @@ all: $(BUILD)/tshearld
 
 $(BUILD)/tshearld: $(TSHEAR_OBJECTS)
 	$(FC) $(FFLAGS) $^ -o $@
+
+# CQDMEM thermal load (mis/qdmem.f as called from EDTL: four TRIMEM(1) calls)
+# and lumped mass (mis/masstq.f, the EMGOLD mass path of QDMEMS/QDMEMD): its
+# own binary, reusing the BASGLB/CSTMRD stubs of the rod load harness.
+QDMEMX_OBJECTS := $(addprefix $(BUILD)/,qdmem.o trimem.o masstq.o basglb_cs.o mpyl.o premat.o \
+                  sort.o gmmats.o khrfn1.o kstubs.o loadstubs.o qdmemx.o)
+
+all: $(BUILD)/qdmemx
+
+$(BUILD)/qdmemx: $(QDMEMX_OBJECTS)
+	$(FC) $(FFLAGS) $^ -o $@
