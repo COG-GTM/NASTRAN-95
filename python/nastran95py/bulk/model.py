@@ -10,6 +10,16 @@ Supported cards: GRID, GRDSET, SPOINT, SEQGP, CORD1R/C/S, CORD2R/C/S, CROD,
 CONROD, PROD, CSHEAR, PSHEAR, CTRMEM, PTRMEM, CQDMEM, CQDMEM1, CQDMEM2, PQDMEM,
 PQDMEM1, PQDMEM2, MAT1, MAT2, MATT1, TABLEM1-4, FORCE, MOMENT, SPC, SPC1, TEMP and TEMPD. Other
 cards are kept in ``BulkModel.ignored`` (counted, not interpreted).
+
+Temperature-dependent materials: MATT1 cards become
+:class:`~nastran95py.materials.Matt1` records and TABLEM1-4 cards become
+:class:`~nastran95py.materials.TableM1`/``TableM2``/``TableM3``/``TableM4``. Both
+are passed to ``MaterialTable(mat1, mat2, matt1, tablem)`` as
+``BulkModel.materials``, so ``model.materials.mat1(mid, temperature)``
+evaluates MAT1 at any temperature (MATT1 factors applied, as MAT does).
+Parameters come before the (x, y) pairs or polynomial coefficients that run
+up to ENDT: TABLEM1 has none, TABLEM2 has X1, TABLEM3 has X1 and X2, and
+TABLEM4 has X1, X2, XA and XB.
 """
 
 from __future__ import annotations

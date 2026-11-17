@@ -211,11 +211,12 @@ def test_qdmem1_matches_live_harness():
         for c in EMG_CASES + SINGLE_CASES
         for m, g in zip(live[c.name].matrices, gold[c.name]["matrices"], strict=True)
     ]
-    errs += [
-        _err(live[c.name].words[k], gold[c.name]["words"][k])
-        for c in SDR_CASES
-        for k in ("PHASE1", "STRESS")
-    ]
+    errs += [_err(live[c.name].words["PHASE1"], gold[c.name]["words"]["PHASE1"]) for c in SDR_CASES]
+    for c in SDR_CASES:
+        got, want = live[c.name].words["STRESS"], np.asarray(gold[c.name]["words"]["STRESS"])
+        # ANGLE (word 5) comes from atan2f, which may differ by an ulp between gfortran builds.
+        np.testing.assert_allclose(got[4], want[4], rtol=2.5e-7, atol=1e-30)
+        errs.append(_err(np.delete(got, 4), np.delete(want, 4)))
     errs += [_err(live[c.name].words["LOAD"], gold[c.name]["words"]["LOAD"]) for c in LOAD_CASES]
     a, r = max(e[0] for e in errs), max(e[1] for e in errs)
     record_parity("qdmem1 golden vs live harness", len(errs), a, r)
