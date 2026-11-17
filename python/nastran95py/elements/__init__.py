@@ -30,6 +30,16 @@ from nastran95py.elements.rod_loads import (
     rod_loads,
     tube_area,
 )
+from nastran95py.elements.shear import (
+    ShearBatch,
+    ShearBatchMatrices,
+    ShearGeometryError,
+    ShearMatrices,
+    ShearProperties,
+    shear_matrices,
+    shear_properties,
+    sheard,
+)
 
 __all__ = [
     "CARD_LAYOUTS",
@@ -47,6 +57,11 @@ __all__ = [
     "RodLoadBatch",
     "RodMatrices",
     "RodProperties",
+    "ShearBatch",
+    "ShearBatchMatrices",
+    "ShearGeometryError",
+    "ShearMatrices",
+    "ShearProperties",
     "assemble",
     "load_vector",
     "real_cstm",
@@ -56,4 +71,7 @@ __all__ = [
     "rod_properties",
     "rodd",
     "tube_area",
+    "shear_matrices",
+    "shear_properties",
+    "sheard",
 ]
