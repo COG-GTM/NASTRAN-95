@@ -50,6 +50,23 @@ from nastran95py.elements.qdmem1 import (
     sqdm12,
 )
 from nastran95py.elements.qdmem1 import stress_table as qdmem1_stress_table
+from nastran95py.elements.qdmem2 import (
+    Qdmem2Batch,
+    Qdmem2BatchMatrices,
+    Qdmem2Error,
+    Qdmem2Load,
+    Qdmem2Matrices,
+    Qdmem2Stresses,
+    Qdmem2StressMatrices,
+    qdmem2_matrices,
+    qdmem2_stress_matrices,
+    qdmem2_stresses,
+    qdmem2_thermal_loads,
+    qdmm2,
+    qdmm2d,
+    sqdm21,
+    sqdm22,
+)
 from nastran95py.elements.quad_membrane import (
     MeanPlane,
     QuadGeometryError,
@@ -137,6 +154,21 @@ from nastran95py.elements.trmem_stress import (
 )
 
 __all__ = [
+    "Qdmem2Batch",
+    "Qdmem2BatchMatrices",
+    "Qdmem2Error",
+    "Qdmem2Load",
+    "Qdmem2Matrices",
+    "Qdmem2StressMatrices",
+    "Qdmem2Stresses",
+    "qdmem2_matrices",
+    "qdmem2_stress_matrices",
+    "qdmem2_stresses",
+    "qdmem2_thermal_loads",
+    "qdmm2",
+    "qdmm2d",
+    "sqdm21",
+    "sqdm22",
     "CARD_LAYOUTS",
     "LAYOUTS",
     "EcptLayout",
