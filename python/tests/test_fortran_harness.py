@@ -250,19 +250,64 @@ MEMBRANE_STRESS = [
 ]
 
 
-@pytest.mark.parametrize("name", MEMBRANE_STRESS)
-def test_membrane_constant_strain_patch(results, name):
-    r = results[name]
-    sx, sy, txy, _angle, s1, s2, smax = r.words["STRESS"][1:8]
-    p1, p2, rad = _principal(sx, sy, txy)
-    assert (s1, s2) == pytest.approx((p1, p2), rel=1e-5, abs=1e-3)
-    if r.case.meta["mid"] in C.MAT1_BY_ID:
-        e, _g, nu = C.MAT1_BY_ID[r.case.meta["mid"]][:3]
-        ex, ey, gxy = C.STRAIN.values()
+def _element_axes(grids):
+    g = np.asarray(grids, float)
+    n = np.cross(g[2] - g[0], g[3] - g[1]) if len(g) == 4 else np.cross(g[1] - g[0], g[2] - g[0])
+    n /= np.linalg.norm(n)
+    x = g[1] - g[0]
+    x -= x.dot(n) * n
+    x /= np.linalg.norm(x)
+    return x, np.cross(n, x)
+
+
+def _rotate_stress(s, deg):
+    c, sn = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+    return np.array(
+        [
+            c * c * s[0] + sn * sn * s[1] + 2 * c * sn * s[2],
+            sn * sn * s[0] + c * c * s[1] - 2 * c * sn * s[2],
+            (s[1] - s[0]) * c * sn + (c * c - sn * sn) * s[2],
+        ]
+    )
+
+
+def _plane_stress_d(mid, theta):
+    if mid in C.MAT1_BY_ID:
+        e, _g, nu = C.MAT1_BY_ID[mid][:3]
         d = e / (1 - nu * nu)
-        exact = (d * (ex + nu * ey), d * (ey + nu * ex), d * (1 - nu) / 2 * gxy)
-        if r.case.grids[0][2] == r.case.grids[1][2] == r.case.grids[2][2]:
-            assert (sx, sy, txy) == pytest.approx(exact, rel=1e-5)
+        return np.array([[d, d * nu, 0], [d * nu, d, 0], [0, 0, d * (1 - nu) / 2]])
+    g = dict(C.MAT2)[mid]
+    d = np.array([[g[0], g[1], g[2]], [g[1], g[3], g[4]], [g[2], g[4], g[5]]])
+    c, s = math.cos(math.radians(theta)), math.sin(math.radians(theta))
+    t = np.array(
+        [[c * c, s * s, c * s], [s * s, c * c, -c * s], [-2 * c * s, 2 * c * s, c * c - s * s]]
+    )
+    return t.T @ d @ t
+
+
+def _patch_stress(case):
+    """Plane stress of the uniform basic-frame STRAIN in the element frame (x along G1-G2)."""
+    ex, ey, gxy = C.STRAIN.values()
+    eps = np.array([[ex, gxy / 2, 0.0], [gxy / 2, ey, 0.0], [0.0, 0.0, 0.0]])
+    x, y = _element_axes(case.grids)
+    strain = np.array([x @ eps @ x, y @ eps @ y, 2 * x @ eps @ y])
+    theta = case.meta.get("theta", 0.0)
+    stress = _plane_stress_d(case.meta["mid"], theta) @ strain
+    # SQDM22 reports CQDMEM2 stresses in the material axes.
+    return _rotate_stress(stress, theta) if case.element == "CQDMEM2" else stress
+
+
+def test_membrane_constant_strain_patch(results):
+    worst = (0.0, 0.0)
+    for name in MEMBRANE_STRESS:
+        r = results[name]
+        sx, sy, txy, _angle, s1, s2, _smax = r.words["STRESS"][1:8]
+        p1, p2, _rad = _principal(sx, sy, txy)
+        assert (s1, s2) == pytest.approx((p1, p2), rel=1e-5, abs=1e-3), name
+        err = _err([sx, sy, txy], _patch_stress(r.case))
+        assert err[1] < 1e-6, (name, err)
+        worst = tuple(map(max, worst, err))
+    record_parity("membrane stress vs D*strain patch", 3 * len(MEMBRANE_STRESS), *worst)
 
 
 def test_membrane_routines_agree_on_principal_stresses(results):
