@@ -57,7 +57,7 @@ def test_element_temperatures(deck):
     temps = {r.data.temperature for recs in ecpts.values() for r in recs}
     tset = TEMPERATURE_SETS.get(deck_id)
     if tset is None:
-        assert temps == {0.0}
+        assert temps == {None}
         return
     for recs in ecpts.values():
         for r in recs:

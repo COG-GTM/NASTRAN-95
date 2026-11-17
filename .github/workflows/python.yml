@@ -77,3 +77,5 @@ jobs:
         run: python -m pytest tests/test_qdmem.py
       - name: Pytest (CQDMEM2 kernels)
         run: python -m pytest tests/test_qdmem2.py
+      - name: Pytest (material temperature selection)
+        run: python -m pytest tests/test_material_temperature.py

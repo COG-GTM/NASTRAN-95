@@ -58,7 +58,8 @@ class ElementData:
     element: str
     fields: dict[str, int | float | tuple[int, ...] | FloatArray]
     grids: list[GridPoint]
-    temperature: float = 0.0
+    temperature: float | None = None
+    """``MAT`` lookup temperature; ``None`` without a material temperature set."""
     extra: dict[str, int | float | tuple[int, ...] | FloatArray] = field(default_factory=dict)
 
     @property
@@ -146,7 +147,9 @@ class EcptLayout:
             out += put(f, data.fields[f.name])
         for g in data.grids:
             out += [int_to_bits(g.cid), *(real(c) for c in g.xyz)]
-        trailer_values = {"eltemp": data.temperature, **data.extra}
+        # TA1ETD writes TI = 0.0 when there is no temperature set (ITEMP = 0).
+        eltemp = 0.0 if data.temperature is None else data.temperature
+        trailer_values = {"eltemp": eltemp, **data.extra}
         for f in self.trailer:
             out += put(f, trailer_values[f.name])
         return out

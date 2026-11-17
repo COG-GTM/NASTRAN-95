@@ -7,8 +7,9 @@ block per grid (displacement CID and basic coordinates, in connection order) and
 the element temperature.
 
 The element temperature follows ``TA1B``/``TA1ETD``: with no material
-temperature set it is 0.0, otherwise the average of the connected grid
-temperatures of that set (TEMP, falling back to the set's TEMPD default).
+temperature set it is ``None`` (MATT1 ignored; the ECPT word packs as 0.0),
+otherwise the average of the connected grid temperatures of that set (TEMP,
+falling back to the set's TEMPD default).
 """
 
 from __future__ import annotations
@@ -60,9 +61,17 @@ def material_temperature_set(case_control: list[str]) -> int | None:
     return sets.pop() if sets else None
 
 
-def element_temperature(model: BulkModel, grids: tuple[int, ...], temp_set: int | None) -> float:
+def element_temperature(
+    model: BulkModel, grids: tuple[int, ...], temp_set: int | None
+) -> float | None:
+    """Mean grid temperature of ``temp_set``; ``None`` when there is no material set.
+
+    ``PREMAT`` (mis/premat.f, after label 148) reads MATT1 only when the material set
+    ``TEMPID`` (``KSYSTM(10)``) is nonzero: ``IF (.NOT.PLA .AND. TEMPID.EQ.0) GO TO 350``
+    skips the MATTi cards, so every ``MAT`` call returns the MAT1 values as input.
+    """
     if not temp_set:
-        return 0.0
+        return None
     return sum(model.grid_temperature(temp_set, g) for g in grids) / len(grids)
 
 
