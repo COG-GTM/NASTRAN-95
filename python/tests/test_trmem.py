@@ -299,7 +299,7 @@ def test_every_deck_trmem_through_kernel():
     worst = _Worst()
     for deck_id, model, datas in _deck_trmems():
         batch = trmem_matrices(TrmemBatch.from_elements(datas, model.materials), model.cstm)
-        tbar = [d.temperature + 100.0 for d in datas]
+        tbar = [(d.temperature or 0.0) + 100.0 for d in datas]
         loads = trmem_thermal_loads(
             TrmemBatch.from_elements(datas, model.materials), tbar, model.cstm
         )

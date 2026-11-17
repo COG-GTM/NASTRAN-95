@@ -113,7 +113,7 @@ class QdmemBatch:
     t: FloatArray
     nsm: FloatArray
     temperature: FloatArray
-    """Element temperature (ECPT word 26), the ``MAT`` lookup temperature."""
+    """Element temperature (ECPT word 26), the ``MAT`` lookup temperature; NaN: none."""
 
     @classmethod
     def from_elements(cls, elements: Sequence[ElementData]) -> QdmemBatch:
@@ -131,7 +131,9 @@ class QdmemBatch:
             mid=col("mid", np.int64),
             t=col("t"),
             nsm=col("nsm"),
-            temperature=np.array([d.temperature for d in elements], float).reshape(n),
+            temperature=np.array(
+                [np.nan if d.temperature is None else d.temperature for d in elements], float
+            ).reshape(n),
         )
 
     def __len__(self) -> int:
@@ -292,9 +294,10 @@ def _materials(batch: QdmemBatch, sinth, costh, materials: MaterialTable, real_w
     alpha = np.zeros((n, 4, 3))
     scalars = np.zeros((3, n, 4))
     cache: dict = {}
+    temps = [None if np.isnan(t) else float(t) for t in batch.temperature]
     for i in range(n):
         for j in range(4):
-            key = (int(batch.mid[i]), float(sinth[i, j]), float(costh[i, j]), batch.temperature[i])
+            key = (int(batch.mid[i]), float(sinth[i, j]), float(costh[i, j]), temps[i])
             if key not in cache:
                 mid, s, c, temp = key
                 if real_words:

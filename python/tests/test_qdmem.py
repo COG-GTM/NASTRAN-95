@@ -449,7 +449,7 @@ def test_every_deck_qdmem_batch_matches_element_path():
     for deck_id, model, datas in _deck_qdmems():
         batch = QdmemBatch.from_elements(datas)
         mats = qdmem_matrices(batch, model.materials, model.cstm)
-        tbar = [d.temperature + 100.0 for d in datas]
+        tbar = [(d.temperature or 0.0) + 100.0 for d in datas]
         loads = qdmem_thermal_loads(batch, model.materials, tbar, model.cstm)
         p1 = qdmem_stress_matrices(batch, model.materials, model.cstm)
         u = np.random.default_rng(len(datas)).uniform(-1e-3, 1e-3, max(model.sil.values()) + 6)
