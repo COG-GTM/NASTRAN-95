@@ -81,6 +81,16 @@ RODD cases in `golden/rod_golden.json`, used by `tests/test_rod.py`;
 SSGETD/FEDT/CSTM stubs in `loadstubs.f`; `python -m tests.fortran_harness.rod_load_cases`
 regenerates `golden/rod_load_golden.json`, used by `tests/test_rod_loads.py`.
 
+`build/qdmm1load` links `mis/qdmm1.f`, the CQDMEM1 EDTL thermal load, with
+`basglb`/`premat`/`gmmats`; `python -m tests.fortran_harness.qdmem1_cases`
+regenerates `golden/qdmem1_golden.json` (warped, anisotropic, coordinate-system
+and diagonal-intersection-branch `QDMM1D`/`QDMM1S`/`SQDM11`/`SQDM12` cases plus
+`QDMM1` loads), used by `tests/test_qdmem1.py` together with the CQDMEM1 stress
+tables of d01012a, d01013a and d01032a (the last via a static solve, since its
+printed displacements never cover a whole element). Note that `QDMM1D`/`QDMM1S`
+take DEGRA from word 5 of `/CONDAS/` (4 pi^2), so their MAT2 material angle is
+`THETA * 4 pi^2` radians; the port reproduces this (`qdmm1d_material_angle`).
+
 `build/tshearld` links `mis/tshear.f`, the EDTL thermal load routine for CSHEAR
 (pseudo-rods on the four panel edges), against the same `basglb`/`mpyl` and
 `loadstubs.f` stubs (SSGETD also returns the grid temperatures `TI(2..5)`);

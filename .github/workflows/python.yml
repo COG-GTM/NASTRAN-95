@@ -71,3 +71,5 @@ jobs:
         run: python -m pytest tests/test_rod.py tests/test_rod_loads.py tests/test_rod_stress.py
       - name: Pytest (CTRMEM kernels)
         run: python -m pytest tests/test_trmem.py tests/test_trmem_stress.py
+      - name: Pytest (CQDMEM1 kernels)
+        run: python -m pytest tests/test_qdmem1.py
