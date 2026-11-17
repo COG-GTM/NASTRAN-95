@@ -1,0 +1,218 @@
+C     ELEMENT-LEVEL PARITY HARNESS DRIVER.
+C
+C     STDIN:  NM1 / MAT1 LINES, NM2 / MAT2 LINES, NCS / CSTM LINES (SAME
+C             FORMAT AS ../FORTRAN_KERNELS/DRIVER.F), THEN NCASE AND FOR
+C             EACH CASE (FREE FORMAT, MAY SPAN LINES)
+C               KIND NAME N
+C               IFLAG(1..N)     1 = INTEGER WORD, 0 = REAL WORD
+C               VALUE(1..N)     EST/ECPT RECORD
+C             KIND 1 (EMG):   ICMBAR NGRID
+C             KIND 2 (SMA1):  NPIV  SIL(1..NPIV)
+C             KIND 3 (SDR2):  NAME2 IELTYP NWDSA NWDSTR NWDFOR LDTEMP TEMP
+C                             ELDEFM NDISP  DISP(1..NDISP)
+C             NAME IS THE ROUTINE TO CALL (NAME2 = SDR2 PHASE 2 ROUTINE).
+C
+C     STDOUT: PER CASE  'CASE n KIND NAME', THE MATRICES / WORDS, 'END'.
+C             EMG:  'MATRIX file dict2 ndof icode lbuf prec' + values
+C             SMA1: 'PART npvt jsil ii' + 36 DOUBLE WORDS (6X6 ROW-WISE)
+C             SDR2: 'PHASE1 n', 'STRESS n', 'FORCE n' + REAL WORDS
+C             REAL WORDS PRINT WITH 9 SIGNIFICANT DIGITS, DOUBLE WORDS
+C             WITH 17, SO BOTH ROUND-TRIP EXACTLY.  INTEGER WORDS IN THE
+C             SDR2 OUTPUT (ELEMENT IDS) PRINT AS THEIR REAL BIT PATTERN.
+C
+      PROGRAM ELHARN
+      INTEGER          IZ(300000),BFR(10),N2MAT,KIND,N,IFLAG(400)
+      REAL             R(16),VAL(400),WORDS(400)
+      INTEGER          IWORDS(400)
+      DOUBLE PRECISION DVAL(400)
+      CHARACTER*8      NAME,NAME2
+      COMMON /ZZZZZZ/  Z(300000)
+      COMMON /SYSTEM/  ISYS(100)
+      COMMON /NAMES /  RD,RDREW,WRT,WRTREW,CLSREW
+      INTEGER          RD,RDREW,WRT,WRTREW,CLSREW
+      COMMON /HSTUB /  NM1,M1(12,200),NM2,M2(17,200),ICARD,IPOS
+      COMMON /CONDAS/  CONSTS(5)
+      COMMON /BLANK /  IBLANK(100)
+      COMMON /EMGEST/  EST(400)
+      COMMON /EMGPRM/  IEMG(14),ANYCON,KMBGG(3),IPREC,NOGO,HEAT,ICMBAR,
+     1                 IEMGX(10)
+      LOGICAL          ANYCON,NOGO,HEAT
+      COMMON /EMGDIC/  IEMDIC(2),NLOCS,ELID,ESTID
+      INTEGER          ELID,ESTID
+      COMMON /SMA1ET/  SECPT(100)
+      COMMON /SMA1IO/  ISMAIO(40)
+      COMMON /SMA1CL/  IOPT4,K4GGSW,NPVT,ISMACL(40)
+      COMMON /SMA1HT/  SHEAT
+      LOGICAL          SHEAT
+      COMMON /SDR2X4/  ISDR4(60)
+      COMMON /SDR2X5/  SDR5(4376)
+      COMMON /SDR2X7/  SDR7(4276)
+      COMMON /SDR2X9/  ISDR9(20)
+      COMMON /SDR2DE/  ISDRDE(8),IELTYP,ISDRDX(20)
+      EQUIVALENCE      (Z(1),IZ(1)),(WORDS(1),IWORDS(1))
+      PARAMETER        (ICSTM = 200001, IVEC = 250001)
+      ISYS(1) = 1000
+      ISYS(2) = 6
+      ISYS(9) = 50
+      ISYS(10)= 0
+      ISYS(40)= 32
+      RD = 2
+      RDREW = 0
+      WRT = 3
+      WRTREW = 1
+      CLSREW = 1
+      CONSTS(1) = 4.0*ATAN(1.0)
+      CONSTS(2) = 2.0*CONSTS(1)
+      CONSTS(3) = 180.0/CONSTS(1)
+      CONSTS(4) = CONSTS(1)/180.0
+      CONSTS(5) = 4.0*CONSTS(1)**2
+      READ (*,*) NM1
+      DO 10 I = 1,NM1
+      READ (*,*) M1(1,I),(R(J),J=1,10)
+      DO 5 J = 1,10
+    5 M1(J+1,I) = TRANSFER(R(J),0)
+   10 M1(12,I) = 0
+      READ (*,*) NM2
+      DO 20 I = 1,NM2
+      READ (*,*) M2(1,I),(R(J),J=1,15)
+      DO 15 J = 1,15
+   15 M2(J+1,I) = TRANSFER(R(J),0)
+   20 M2(17,I) = 0
+      READ (*,*) NCS
+      DO 30 I = 1,NCS
+      K = ICSTM + 14*(I-1)
+      READ (*,*) IZ(K),IZ(K+1),(Z(K+J),J=2,13)
+   30 CONTINUE
+      CALL PREMAT (IZ(1),Z(1),BFR,100000,N2MAT,101,0)
+      CALL PRETRS (Z(ICSTM),14*NCS)
+      CALL PRETRD (Z(ICSTM),14*NCS)
+C
+      READ (*,*) NCASE
+      DO 900 IC = 1,NCASE
+      READ (*,*) KIND,NAME,N
+      READ (*,*) (IFLAG(J),J=1,N)
+      READ (*,*) (VAL(J),J=1,N)
+      DO 40 J = 1,N
+      IF (IFLAG(J) .EQ. 1) THEN
+         IWORDS(J) = NINT(VAL(J))
+      ELSE
+         WORDS(J) = VAL(J)
+      END IF
+   40 CONTINUE
+      WRITE (*,'(A,2I6,1X,A)') 'CASE',IC,KIND,NAME
+      IF (KIND .EQ. 1) GO TO 100
+      IF (KIND .EQ. 2) GO TO 200
+      GO TO 300
+C
+C     EMG: STIFFNESS AND MASS VIA EMGOUT
+C
+  100 READ (*,*) ICMBAR,NLOCS
+      DO 110 J = 1,400
+  110 EST(J) = 0.0
+      DO 120 J = 1,N
+  120 EST(J) = WORDS(J)
+      IPREC = 1
+      IF (NAME(6:6).EQ.'D' .OR. NAME.EQ.'RODD') IPREC = 2
+      ISYS(55)  = IPREC
+      IEMG(2)   = 110000
+      IEMG(3)   = 198000
+      KMBGG(1)  = 1
+      KMBGG(2)  = 1
+      KMBGG(3)  = 0
+      ANYCON    = .FALSE.
+      NOGO      = .FALSE.
+      HEAT      = .FALSE.
+      ELID      = IWORDS(1)
+      ESTID     = IWORDS(1)
+      IF (NAME .EQ. 'RODS'  ) CALL RODS
+      IF (NAME .EQ. 'RODD'  ) CALL RODD
+      IF (NAME .EQ. 'SHEARS') CALL SHEARS
+      IF (NAME .EQ. 'SHEARD') CALL SHEARD
+      IF (NAME .EQ. 'TRMEMS') CALL TRMEMS
+      IF (NAME .EQ. 'TRMEMD') CALL TRMEMD
+      IF (NAME .EQ. 'QDMM1S') CALL QDMM1S
+      IF (NAME .EQ. 'QDMM1D') CALL QDMM1D
+      IF (NAME .EQ. 'QDMM2S') CALL QDMM2S
+      IF (NAME .EQ. 'QDMM2D') CALL QDMM2D
+      IF (NOGO) WRITE (*,'(A)') 'NOGO'
+      GO TO 800
+C
+C     SMA1: STIFFNESS PARTITIONS VIA SMA1B, ONE CALL PER PIVOT SIL
+C
+  200 READ (*,*) NPIV,(IFLAG(J),J=1,NPIV)
+      ISYS(55)   = 2
+      ISMAIO(11) = 201
+      ISMAIO(13) = 202
+      IOPT4      = 0
+      K4GGSW     = 0
+      SHEAT      = .FALSE.
+      DO 250 IP = 1,NPIV
+      DO 210 J = 1,100
+  210 SECPT(J) = 0.0
+      DO 220 J = 1,N
+  220 SECPT(J) = WORDS(J)
+      DO 230 J = 1,100
+  230 IBLANK(J) = 0
+      NPVT = IFLAG(IP)
+      IF (NAME .EQ. 'KROD'  ) CALL KROD
+      IF (NAME .EQ. 'KTRMEM') CALL KTRMEM (0)
+      IF (NAME .EQ. 'KQDMEM') CALL KQDMEM
+      IF (NAME .EQ. 'KTRIQD3') CALL KTRIQD (3)
+  250 CONTINUE
+      GO TO 800
+C
+C     SDR2: PHASE 1 (STRESS RECOVERY MATRICES), PHASE 2 (STRESSES)
+C
+  300 READ (*,*) NAME2,IELTYP,NWDSA,NWDSTR,NWDFOR,LDTEMP,TEMP,ELDEFM,
+     1           NDISP,(DVAL(J),J=1,NDISP)
+      DO 310 J = 1,4376
+  310 SDR5(J) = 0.0
+      DO 320 J = 1,N
+  320 SDR5(J) = WORDS(J)
+      DO 330 J = 1,100
+  330 IBLANK(J) = 0
+      ISYS(55) = 1
+      IF (NAME .EQ. 'SROD1' ) CALL SROD1
+      IF (NAME .EQ. 'SPANL1') CALL SPANL1 (4)
+      IF (NAME .EQ. 'STRME1') CALL STRME1 (0)
+      IF (NAME .EQ. 'SQDME1') CALL SQDME1
+      IF (NAME .EQ. 'SQDM11') CALL SQDM11
+      IF (NAME .EQ. 'SQDM21') CALL SQDM21
+      WRITE (*,'(A,I8)') 'PHASE1',NWDSA
+      WRITE (*,'(6(1X,ES16.8E3))') (SDR5(100+J),J=1,NWDSA)
+      DO 340 J = 1,4276
+  340 SDR7(J) = 0.0
+      DO 350 J = 1,NWDSA
+  350 SDR7(J) = SDR5(100+J)
+      DO 360 J = 1,NDISP
+  360 Z(IVEC+J-1) = DVAL(J)
+      DO 370 J = 1,60
+  370 ISDR4(J) = 0
+      ISDR4(34) = ICSTM
+      ISDR4(36) = IVEC
+      ISDR4(37) = IVEC + NDISP - 1
+      IF (LDTEMP .EQ. -1) THEN
+         ISDR4(38) = -1
+      ELSE
+         ISDR4(38) = TRANSFER(TEMP,0)
+      END IF
+      ISDR4(39) = TRANSFER(ELDEFM,0)
+      DO 380 J = 1,20
+  380 ISDR9(J) = 0
+      IF (NAME2 .EQ. 'SROD2' ) CALL SROD2
+      IF (NAME2 .EQ. 'SPANL2') CALL SPANL2 (4)
+      IF (NAME2 .EQ. 'STQME2') THEN
+         IF (NAME .EQ. 'STRME1') CALL STQME2 (1)
+         IF (NAME .EQ. 'SQDME1') CALL STQME2 (2)
+      END IF
+      IF (NAME2 .EQ. 'SQDM12') CALL SQDM12
+      IF (NAME2 .EQ. 'SQDM22') CALL SQDM22
+      WRITE (*,'(A,I8)') 'STRESS',NWDSTR
+      WRITE (*,'(6(1X,ES16.8E3))') (SDR7(100+J),J=1,NWDSTR)
+      WRITE (*,'(A,I8)') 'FORCE',NWDFOR
+      IF (NWDFOR .GT. 0)
+     1   WRITE (*,'(6(1X,ES16.8E3))') (SDR7(200+J),J=1,NWDFOR)
+C
+  800 WRITE (*,'(A)') 'END'
+  900 CONTINUE
+      END
