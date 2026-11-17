@@ -4,10 +4,12 @@ A CSTM record is 14 words: ``CID, TYPE, X0, Y0, Z0, T11, T12, ..., T33`` where
 ``T`` (stored by rows) maps a vector from the local rectangular frame of the
 system to basic. ``TYPE`` is 1 rectangular, 2 cylindrical, 3 spherical.
 
-``transform_to_basic`` ports the ``TRANSS``/``TRANSD`` entries of
-``mis/pretrs.f`` / ``mis/pretrd.f``: given a coordinate system ID and a point in
-basic coordinates it returns the 3x3 matrix ``TA`` mapping a vector expressed in
-that system's global (displacement) directions at the point to basic.
+``transforms_to_basic`` ports the ``TRANSS``/``TRANSD`` entries of
+``mis/pretrs.f`` / ``mis/pretrd.f`` and ``GBTRAN`` of ``mis/basglb.f``: given
+coordinate system IDs and points in basic coordinates it returns the 3x3
+matrices ``TA`` mapping a vector expressed in that system's global
+(displacement) directions at the point to basic. ``basic_to_global`` and
+``global_to_basic`` port the ``BASGLB`` and ``GLBBAS`` entries.
 """
 
 from __future__ import annotations
@@ -116,56 +118,99 @@ class Cstm(Mapping[int, CoordSystem]):
         return len(self._systems)
 
 
-def transform_to_basic(cstm: Mapping[int, CoordSystem], cid: int, point: ArrayLike) -> FloatArray:
-    """Port of ``TRANSS``/``TRANSD``: global-to-basic matrix ``TA`` at ``point``.
+def transforms_to_basic(
+    cstm: Mapping[int, CoordSystem], cid: ArrayLike, points: ArrayLike
+) -> FloatArray:
+    """Vectorised ``TRANSS``/``TRANSD``/``GBTRAN``: ``TA`` at each of ``points``.
 
-    ``point`` is in basic coordinates. CID 0 returns the identity. For
-    cylindrical and spherical systems the local axes are evaluated at the point;
-    on the polar axis (``r == 0``) the rectangular matrix is returned, as in the
-    Fortran.
+    ``points`` is ``(n, 3)`` (or ``(3,)``) in basic coordinates and ``cid`` a
+    scalar or ``(n,)`` array of coordinate system IDs, so the grids of one
+    element may use different systems. Returns ``(n, 3, 3)``; ``TA[k]`` maps a
+    vector in the global directions of ``cid[k]`` at ``points[k]`` to basic.
+    CID 0 gives the identity. For cylindrical and spherical systems the local
+    axes are evaluated at the point; on the polar axis (``r == 0``) the
+    rectangular matrix is returned, as in the Fortran.
     """
-    if cid == 0:
-        return np.eye(3)
-    try:
-        cs = cstm[cid]
-    except KeyError:
-        raise CstmError(cid) from None
-    if cs.ctype == CoordType.RECTANGULAR:
-        return cs.t.copy()
+    pts = np.atleast_2d(np.asarray(points, dtype=float))
+    if pts.shape[-1] != 3 or pts.ndim != 2:
+        raise ValueError("points must have shape (3,) or (n, 3)")
+    n = pts.shape[0]
+    cids = np.broadcast_to(np.asarray(cid, dtype=np.int64), (n,))
+    out = np.empty((n, 3, 3))
+    for c in np.unique(cids):
+        sel = cids == c
+        if c == 0:
+            out[sel] = np.eye(3)
+            continue
+        try:
+            cs = cstm[int(c)]
+        except KeyError:
+            raise CstmError(int(c)) from None
+        if cs.ctype == CoordType.RECTANGULAR:
+            out[sel] = cs.t
+            continue
+        x, y, z = ((pts[sel] - cs.origin) @ cs.t).T
+        r = np.hypot(x, y)
+        polar = r == 0.0
+        rs = np.where(polar, 1.0, r)
+        tl = np.zeros((x.size, 3, 3))
+        if cs.ctype == CoordType.CYLINDRICAL:
+            tl[:, 0, 0] = x / rs
+            tl[:, 0, 1] = -y / rs
+            tl[:, 1, 0] = y / rs
+            tl[:, 1, 1] = x / rs
+            tl[:, 2, 2] = 1.0
+        else:
+            xl = np.sqrt(x * x + y * y + z * z)
+            xls = np.where(polar, 1.0, xl)
+            tl[:, 0, 0] = x / xls
+            tl[:, 0, 1] = x * z / (rs * xls)
+            tl[:, 0, 2] = -y / rs
+            tl[:, 1, 0] = y / xls
+            tl[:, 1, 1] = y * z / (rs * xls)
+            tl[:, 1, 2] = x / rs
+            tl[:, 2, 0] = z / xls
+            tl[:, 2, 1] = -r / xls
+        tl[polar] = np.eye(3)
+        out[sel] = cs.t @ tl
+    return out
 
-    x, y, z = cs.t.T @ (np.asarray(point, dtype=float).reshape(3) - cs.origin)
-    r = np.hypot(x, y)
-    if r == 0.0:
-        return cs.t.copy()
-    if cs.ctype == CoordType.CYLINDRICAL:
-        tl = np.array(
-            [
-                [x / r, -y / r, 0.0],
-                [y / r, x / r, 0.0],
-                [0.0, 0.0, 1.0],
-            ]
-        )
-    else:
-        xl = np.sqrt(x * x + y * y + z * z)
-        tl = np.array(
-            [
-                [x / xl, x * z / (r * xl), -y / r],
-                [y / xl, y * z / (r * xl), x / r],
-                [z / xl, -r / xl, 0.0],
-            ]
-        )
-    return cs.t @ tl
+
+def transform_to_basic(cstm: Mapping[int, CoordSystem], cid: int, point: ArrayLike) -> FloatArray:
+    """Port of ``TRANSS``/``TRANSD``: global-to-basic matrix ``TA`` at one ``point``.
+
+    Single-point form of :func:`transforms_to_basic`.
+    """
+    return transforms_to_basic(cstm, cid, np.asarray(point, dtype=float).reshape(3))[0]
 
 
 def global_to_basic(
-    cstm: Mapping[int, CoordSystem], cid: int, point: ArrayLike, vector: ArrayLike
+    cstm: Mapping[int, CoordSystem], cid: ArrayLike, point: ArrayLike, vector: ArrayLike
 ) -> FloatArray:
-    """Map a vector in the global directions of ``cid`` at ``point`` to basic."""
-    return transform_to_basic(cstm, cid, point) @ np.asarray(vector, dtype=float)
+    """Port of ``GLBBAS``: map vectors in the global directions of ``cid`` to basic.
+
+    ``point`` and ``vector`` are ``(3,)`` or ``(n, 3)``; the result has the
+    shape of ``vector``.
+    """
+    v = np.asarray(vector, dtype=float)
+    ta = transforms_to_basic(cstm, cid, point)
+    return np.einsum("nij,nj->ni", ta, np.atleast_2d(v)).reshape(v.shape)
 
 
 def basic_to_global(
-    cstm: Mapping[int, CoordSystem], cid: int, point: ArrayLike, vector: ArrayLike
+    cstm: Mapping[int, CoordSystem], cid: ArrayLike, point: ArrayLike, vector: ArrayLike
 ) -> FloatArray:
-    """Map a basic vector at ``point`` to the global directions of ``cid``."""
-    return transform_to_basic(cstm, cid, point).T @ np.asarray(vector, dtype=float)
+    """Port of ``BASGLB``: map basic vectors at ``point`` to the global directions of ``cid``.
+
+    ``point`` and ``vector`` are ``(3,)`` or ``(n, 3)``; the result has the
+    shape of ``vector``.
+    """
+    v = np.asarray(vector, dtype=float)
+    ta = transforms_to_basic(cstm, cid, point)
+    return np.einsum("nji,nj->ni", ta, np.atleast_2d(v)).reshape(v.shape)
+
+
+# Fortran entry-point names of mis/basglb.f (argument order follows the Python API).
+basglb = basic_to_global
+glbbas = global_to_basic
+gbtran = transforms_to_basic

@@ -1,7 +1,7 @@
 """MAT1 isotropic and MAT2 anisotropic material evaluation.
 
-Port of the ``MAT`` entry point of ``mis/premat.f`` for temperature-independent
-materials. The ``inflag`` codes follow the Fortran ``/MATIN/`` contract:
+Port of the ``MAT`` entry point of ``mis/premat.f`` (structural branch).
+The ``inflag`` codes follow the Fortran ``/MATIN/`` contract:
 
 * ``1`` - MAT1 properties in MAT1 format (MAT1 only).
 * ``2`` - MAT2 format: a 3x3 membrane ``G`` matrix, thermal expansion vector and
@@ -11,15 +11,25 @@ materials. The ``inflag`` codes follow the Fortran ``/MATIN/`` contract:
 * ``4`` - density only.
 
 As in the Fortran, MAT1 entries are searched before MAT2 entries with the same
-ID. Temperature-dependent properties (MATT1/MATT2 + TABLEMi) are not ported.
+ID.
+
+Temperature dependence (``TEMPID != 0`` in the Fortran) is requested by passing
+``temp``: every MAT1 property with a MATT1 table is evaluated at that temperature
+through its TABLEM1-4 table before ``inflag`` processing (see
+:mod:`nastran95py.materials.tables`). MATT2 (MAT2 temperature dependence) is not
+ported, so MAT2 properties ignore ``temp``.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, replace
+from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
+
+if TYPE_CHECKING:
+    from nastran95py.materials.tables import TableM
 
 FloatArray = NDArray[np.float64]
 
@@ -49,6 +59,29 @@ class Mat1:
     st: float = 0.0
     sc: float = 0.0
     ss: float = 0.0
+
+
+@dataclass(frozen=True)
+class Matt1:
+    """MATT1 entry: TABLEMi IDs for the MAT1 properties of ``mid`` (0 = constant).
+
+    Field order follows the MPT record; MATT1 has no TREF table.
+    """
+
+    mid: int
+    e: int = 0
+    g: int = 0
+    nu: int = 0
+    rho: int = 0
+    alpha: int = 0
+    ge: int = 0
+    st: int = 0
+    sc: int = 0
+    ss: int = 0
+
+    def table_ids(self) -> dict[str, int]:
+        """Nonzero table references keyed by the MAT1 field name."""
+        return {f.name: getattr(self, f.name) for f in fields(self)[1:] if getattr(self, f.name)}
 
 
 @dataclass(frozen=True)
@@ -155,32 +188,80 @@ def rotation_matrix(sinth: float, costh: float) -> FloatArray:
 
 
 class MaterialTable:
-    """In-memory MAT1/MAT2 tables, the Python stand-in for ``PREMAT`` + ``MAT``."""
+    """In-memory material tables, the Python stand-in for ``PREMAT`` + ``MAT``.
 
-    def __init__(self, mat1: list[Mat1] | None = None, mat2: list[Mat2] | None = None):
+    ``matt1`` and ``tables`` (TABLEM1-4) add temperature dependence to MAT1
+    entries. As in ``PREMAT``, a MATT1 without a matching MAT1 (message 19) or a
+    referenced table missing from ``tables`` (message 41) is rejected.
+    """
+
+    def __init__(
+        self,
+        mat1: list[Mat1] | None = None,
+        mat2: list[Mat2] | None = None,
+        matt1: list[Matt1] | None = None,
+        tables: list[TableM] | None = None,
+    ):
         self._mat1: dict[int, Mat1] = {}
         self._mat2: dict[int, Mat2] = {}
+        self._matt1: dict[int, Matt1] = {}
+        self._tables: dict[int, TableM] = {}
         for m in mat1 or []:
             self.add(m)
         for m in mat2 or []:
             self.add(m)
+        for t in tables or []:
+            self.add_table(t)
+        for m in matt1 or []:
+            self.add(m)
 
-    def add(self, material: Mat1 | Mat2) -> None:
+    def add(self, material: Mat1 | Mat2 | Matt1) -> None:
+        if isinstance(material, Matt1):
+            self._add_matt1(material)
+            return
         table = self._mat1 if isinstance(material, Mat1) else self._mat2
         if material.mid in table:
             raise MaterialError(f"duplicate {type(material).__name__} id {material.mid}")
         table[material.mid] = material
 
-    def mat1(self, mid: int) -> Mat1Out:
+    def add_table(self, table: TableM) -> None:
+        if table.tid in self._tables:
+            raise MaterialError(f"duplicate TABLEM id {table.tid}")
+        self._tables[table.tid] = table
+
+    def _add_matt1(self, matt1: Matt1) -> None:
+        if matt1.mid not in self._mat1:
+            raise MaterialError(f"MATT1 {matt1.mid} has no matching MAT1 (message 19)")
+        if matt1.mid in self._matt1:
+            raise MaterialError(f"duplicate MATT1 id {matt1.mid}")
+        missing = sorted(set(matt1.table_ids().values()) - self._tables.keys())
+        if missing:
+            raise MaterialError(f"MATT1 {matt1.mid} references undefined tables {missing}")
+        self._matt1[matt1.mid] = matt1
+
+    def mat1_at(self, mid: int, temp: float | None) -> Mat1 | None:
+        """MAT1 entry with its MATT1 properties evaluated at ``temp`` (``None``: as input)."""
+        m = self._mat1.get(mid)
+        if m is None or temp is None or mid not in self._matt1:
+            return m
+        values = {
+            name: self._tables[tid].evaluate(temp, getattr(m, name))
+            for name, tid in self._matt1[mid].table_ids().items()
+        }
+        return replace(m, **values)
+
+    def mat1(self, mid: int, temp: float | None = None) -> Mat1Out:
         """``inflag = 1``: MAT1 properties in MAT1 format."""
-        m = self._find1(mid)
+        m = self._find1(mid, temp)
         if m is None:
             raise MaterialNotFoundError(mid)
         return Mat1Out(m.e, m.g, m.nu, m.rho, m.alpha, m.tref, m.ge, m.st, m.sc, m.ss)
 
-    def mat2(self, mid: int, sinth: float = 0.0, costh: float = 1.0) -> Mat2Out:
+    def mat2(
+        self, mid: int, sinth: float = 0.0, costh: float = 1.0, temp: float | None = None
+    ) -> Mat2Out:
         """``inflag = 2``: MAT2 format in element axes rotated by the material angle."""
-        m1 = self._find1(mid)
+        m1 = self._find1(mid, temp)
         if m1 is not None:
             g11 = m1.e / (1.0 - m1.nu**2)
             g = np.array(
@@ -215,38 +296,43 @@ class MaterialTable:
             alpha = u_alpha @ alpha
         return Mat2Out(g, m2.rho, alpha, m2.tref, m2.ge, m2.st, m2.sc, m2.ss, "MAT2")
 
-    def transverse_shear(self, mid: int) -> tuple[float, float, float]:
+    def transverse_shear(self, mid: int, temp: float | None = None) -> tuple[float, float, float]:
         """``inflag = 3``: ``(J11, J12, J22)``."""
-        m1 = self._find1(mid)
+        m1 = self._find1(mid, temp)
         if m1 is not None:
             return (m1.g, 0.0, m1.g)
         if self._find2(mid) is None:
             raise MaterialNotFoundError(mid)
         return (0.0, 0.0, 0.0)
 
-    def density(self, mid: int) -> float:
+    def density(self, mid: int, temp: float | None = None) -> float:
         """``inflag = 4``: mass density."""
-        m: Mat1 | Mat2 | None = self._find1(mid) or self._find2(mid)
+        m: Mat1 | Mat2 | None = self._find1(mid, temp) or self._find2(mid)
         if m is None:
             raise MaterialNotFoundError(mid)
         return m.rho
 
     def mat(
-        self, mid: int, inflag: int, sinth: float = 0.0, costh: float = 1.0
+        self,
+        mid: int,
+        inflag: int,
+        sinth: float = 0.0,
+        costh: float = 1.0,
+        temp: float | None = None,
     ) -> Mat1Out | Mat2Out | tuple[float, float, float] | float:
-        """Dispatch on the Fortran ``inflag`` code (1-4)."""
+        """Dispatch on the Fortran ``inflag`` code (1-4); ``temp`` is ``/MATIN/`` TEMP."""
         if inflag == 1:
-            return self.mat1(mid)
+            return self.mat1(mid, temp)
         if inflag == 2:
-            return self.mat2(mid, sinth, costh)
+            return self.mat2(mid, sinth, costh, temp)
         if inflag == 3:
-            return self.transverse_shear(mid)
+            return self.transverse_shear(mid, temp)
         if inflag == 4:
-            return self.density(mid)
+            return self.density(mid, temp)
         raise MaterialError(f"inflag {inflag} is not ported")
 
-    def _find1(self, mid: int) -> Mat1 | None:
-        return self._mat1.get(mid)
+    def _find1(self, mid: int, temp: float | None = None) -> Mat1 | None:
+        return self.mat1_at(mid, temp)
 
     def _find2(self, mid: int) -> Mat2 | None:
         return self._mat2.get(mid)

@@ -64,3 +64,9 @@ does) to make that a failure. Run only parity with `python -m pytest -m fortran`
 
 The element-level harness lives in `tests/fortran_harness/`; CI runs
 `make -C python/tests/fortran_harness` whenever that directory exists.
+It links the unmodified RF1 element routines (EMG `rods/rodd`, `shears/sheard`,
+`trmems/trmemd`, `qdmm1s/d`, `qdmm2s/d`; SMA1 `krod`, `ktrmem`, `kqdmem`,
+`ktriqd`; SDR2 `srod1/2`, `spanl1/2`, `strme1`, `sqdme1`, `sqdm11/12/21/22`,
+`stqme2`) and dumps K, M and stress/force words for the hand-built cases in
+`tests/fortran_harness/cases.py` (`tests/test_fortran_harness.py`);
+`python -m tests.fortran_harness.runner` regenerates `golden/harness_golden.json`.

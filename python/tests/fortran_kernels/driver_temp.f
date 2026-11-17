@@ -1,0 +1,115 @@
+C     MATT1/TABLEM1-4 PARITY DRIVER FOR MAT (MIS/PREMAT.F) WITH TEMPID
+C     NONZERO. READS LIST-DIRECTED INPUT ON STDIN:
+C       NMAT1,  THEN NMAT1 LINES:  MID E G NU RHO ALPHA TREF GE ST SC SS
+C       NMAT2,  THEN NMAT2 LINES:  MID G11 G12 G13 G22 G23 G33 RHO A1 A2
+C                                  A12 TREF GE ST SC SS
+C       NMATT1, THEN NMATT1 LINES: MID TE TG TNU TRHO TA TTREF TGE TST
+C                                  TSC TSS (TABLE IDS, 0 = CONSTANT)
+C       NTAB,   THEN PER TABLE:    ITYPE ID X1 X2 X3 X4 NV
+C                                  V(1..NV) (XY PAIRS, OR COEFFICIENTS
+C                                  FOR ITYPE 4)
+C       NCASE,  THEN NCASE LINES:  INFLAG MATID TEMP SINTH COSTH
+C     ONE OUTPUT LINE (/MATOUT/ 1-25) PER CASE.
+C
+      PROGRAM TKERNL
+      INTEGER          IZ(300000),BFR(10),N2MAT,W,IT(11),IDS(4)
+      REAL             R(16),V(1000)
+      COMMON /ZZZZZZ/  Z(300000)
+      COMMON /SYSTEM/  ISYS(100)
+      COMMON /NAMES /  RD,RDREW,WRT,WRTREW,CLSREW
+      INTEGER          RD,RDREW,WRT,WRTREW,CLSREW
+      COMMON /MATIN /  MATID,INFLAG,TEMP,PLAARG,SINTH,COSTH
+      COMMON /MATOUT/  OUT(25),ITDEP,IDUM(26)
+      COMMON /TSTUB /  ICODE(7),IBEG(7),IEND(7),W(200000),NW,IC,IPOS
+      EQUIVALENCE      (Z(1),IZ(1))
+      DATA IDS /105,205,305,405/
+C
+      ISYS(1) = 1000
+      ISYS(2) = 6
+      ISYS(10)= 1
+      RD = 2
+      RDREW = 0
+      WRT = 3
+      WRTREW = 1
+      CLSREW = 1
+C
+      NW = 0
+      READ (*,*) N
+      IBEG(1) = NW + 1
+      DO 10 I = 1,N
+      READ (*,*) MID,(R(J),J=1,10)
+      CALL PUTI (MID)
+      DO 5 J = 1,10
+    5 CALL PUTR (R(J))
+   10 CALL PUTI (0)
+      IEND(1) = NW
+      READ (*,*) N
+      IBEG(2) = NW + 1
+      DO 20 I = 1,N
+      READ (*,*) MID,(R(J),J=1,15)
+      CALL PUTI (MID)
+      DO 15 J = 1,15
+   15 CALL PUTR (R(J))
+   20 CALL PUTI (0)
+      IEND(2) = NW
+      READ (*,*) N
+      IBEG(3) = NW + 1
+      DO 30 I = 1,N
+      READ (*,*) (IT(J),J=1,11)
+      DO 30 J = 1,11
+   30 CALL PUTI (IT(J))
+      IEND(3) = NW
+C
+C     TABLES ARE GROUPED BY TYPE INTO THE FOUR DIT STREAMS
+C
+      READ (*,*) NTAB
+      NTSAVE = NW
+      DO 60 K = 1,4
+      IBEG(K+3) = NW + 1
+      IEND(K+3) = NW
+   60 CONTINUE
+      DO 90 I = 1,NTAB
+      READ (*,*) ITYPE,ID,(R(J),J=1,4),NV
+      READ (*,*) (V(J),J=1,NV)
+      K = ITYPE + 3
+C     APPEND TO STREAM K (STREAMS ARE FILLED IN TYPE ORDER BY THE
+C     PYTHON SIDE, SO STREAM K ALWAYS ENDS AT NW)
+      IF (IEND(K) .LT. IBEG(K)) IBEG(K) = NW + 1
+      CALL PUTI (ID)
+      DO 70 J = 1,4
+   70 CALL PUTR (R(J))
+      CALL PUTI (0)
+      CALL PUTI (0)
+      CALL PUTI (0)
+      DO 80 J = 1,NV
+   80 CALL PUTR (V(J))
+      CALL PUTI (-1)
+      IF (ITYPE .NE. 4) CALL PUTI (-1)
+      IEND(K) = NW
+   90 CONTINUE
+C
+      CALL PREMAT (IZ(1),Z(1),BFR,100000,N2MAT,101,102)
+C
+      READ (*,*) NCASE
+      DO 100 IC1 = 1,NCASE
+      READ (*,*) INFLAG,MATID,TEMP,SINTH,COSTH
+      CALL MAT (1)
+      WRITE (*,'(25(1X,ES16.8E3))') (OUT(J),J=1,25)
+  100 CONTINUE
+      END
+C
+      SUBROUTINE PUTI (I)
+      INTEGER W
+      COMMON /TSTUB/ ICODE(7),IBEG(7),IEND(7),W(200000),NW,IC,IPOS
+      NW = NW + 1
+      W(NW) = I
+      RETURN
+      END
+C
+      SUBROUTINE PUTR (X)
+      INTEGER W
+      COMMON /TSTUB/ ICODE(7),IBEG(7),IEND(7),W(200000),NW,IC,IPOS
+      NW = NW + 1
+      W(NW) = TRANSFER(X,0)
+      RETURN
+      END
