@@ -54,9 +54,9 @@ import numpy as np
 from numpy.typing import NDArray
 
 from nastran95py.coords import CoordSystem
-from nastran95py.coords.transforms import CoordType
 from nastran95py.elements.contract import ElementData
 from nastran95py.elements.rod import real_cstm
+from nastran95py.elements.rod_stress import _transs
 from nastran95py.elements.trmem import TrmemGeometryError, trmem_properties
 from nastran95py.materials import MaterialTable
 
@@ -167,41 +167,8 @@ def transs(cs: CoordSystem, pts: np.ndarray, real_words: bool = True) -> FloatAr
     The global-to-basic matrix ``TA`` (``v_basic = TA v_global``), evaluated in
     the working precision in the Fortran order from the CSTM words.
     """
-    dt = _dtype(real_words)
-    ke = np.asarray(cs.t).astype(dt)
-    pts = np.asarray(pts).astype(dt).reshape(-1, 3)
-    m = pts.shape[0]
-    ta = np.broadcast_to(ke, (m, 3, 3)).copy()
-    if int(cs.ctype) == CoordType.RECTANGULAR:
-        return ta
-    xn = pts - np.asarray(cs.origin).astype(dt)
-    x = ke[0, 0] * xn[:, 0] + ke[1, 0] * xn[:, 1] + ke[2, 0] * xn[:, 2]
-    y = ke[0, 1] * xn[:, 0] + ke[1, 1] * xn[:, 1] + ke[2, 1] * xn[:, 2]
-    z = ke[0, 2] * xn[:, 0] + ke[1, 2] * xn[:, 1] + ke[2, 2] * xn[:, 2]
-    r = np.sqrt(x * x + y * y)
-    k = r != 0.0
-    if not k.any():
-        return ta
-    x, y, z, r = x[k], y[k], z[k], r[k]
-    tl = np.zeros((x.shape[0], 3, 3), dt)
-    if int(cs.ctype) == CoordType.CYLINDRICAL:
-        tl[:, 0, 0] = x / r
-        tl[:, 0, 1] = -y / r
-        tl[:, 1, 0] = -tl[:, 0, 1]
-        tl[:, 1, 1] = tl[:, 0, 0]
-        tl[:, 2, 2] = dt(1.0)
-    else:
-        xl = np.sqrt(x * x + y * y + z * z)
-        tl[:, 0, 0] = x / xl
-        tl[:, 0, 1] = (x * z) / (r * xl)
-        tl[:, 0, 2] = -y / r
-        tl[:, 1, 0] = y / xl
-        tl[:, 1, 1] = (y * z) / (r * xl)
-        tl[:, 1, 2] = x / r
-        tl[:, 2, 0] = z / xl
-        tl[:, 2, 1] = -r / xl
-    ta[k] = _mm(np.broadcast_to(ke, tl.shape), tl, dt)
-    return ta
+    pts = np.asarray(pts, float).reshape(-1, 3)
+    return _transs(cs, pts, _dtype(real_words))
 
 
 def membrane_stress_matrices(
