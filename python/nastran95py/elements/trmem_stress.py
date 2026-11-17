@@ -36,7 +36,9 @@ products in double precision. With ``real_words=True`` (default) every step is
 evaluated in float32 in the Fortran order, including ``MAT``, ``TRANSS`` with
 the REAL CSTM words it reads, ``GMMATS`` (accumulated term by term) and the
 principal-stress formulas, so the results reproduce the gfortran build to the
-last bit. ``real_words=False`` evaluates the same expressions in float64.
+last bit, except the principal angle: REAL ``ATAN2`` comes from the C library,
+whose ``atan2f`` differs by 1 ulp between versions (see :func:`_atan2f`).
+``real_words=False`` evaluates the same expressions in float64.
 
 The ``NCHK`` precision check of ``STQME2`` (a diagnostic print) and the
 ``STRAIN`` option of ``STRME1`` (``G`` replaced by the identity) are not ported.
@@ -44,8 +46,6 @@ The ``NCHK`` precision check of ``STQME2`` (a diagnostic print) and the
 
 from __future__ import annotations
 
-import ctypes
-import ctypes.util
 import struct
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -68,33 +68,17 @@ NO_TEMPERATURE = np.nan
 """Load temperature of a subcase without TEMPERATURE(LOAD) (``LDTEMP = -1``)."""
 
 
-def _load_atan2f():
-    name = ctypes.util.find_library("m")
-    try:
-        fn = ctypes.CDLL(name).atan2f if name else None
-    except (AttributeError, OSError):
-        fn = None
-    if fn is not None:
-        fn.restype = ctypes.c_float
-        fn.argtypes = [ctypes.c_float, ctypes.c_float]
-    return fn
-
-
-_LIBM_ATAN2F = _load_atan2f()
-
-
 def _atan2f(y: np.ndarray, x: np.ndarray) -> np.ndarray:
-    """REAL ``ATAN2``: the C library's ``atan2f``, which gfortran calls.
+    """REAL ``ATAN2``: the double-precision result rounded once to REAL.
 
-    NumPy's float32 ``arctan2`` is dispatched to CPU-dependent SIMD kernels and
-    differs from libm by 1 ulp on some runners, so libm is called directly
-    (falling back to NumPy where no libm is found).
+    That is the correctly rounded ``atan2f`` of newer C libraries (gfortran calls
+    libm). Older libms (glibc 2.35) and NumPy's SIMD float32 ``arctan2`` differ
+    from it by 1 ulp for some arguments, so the angle is only reproducible to 1 ulp
+    across platforms; this choice at least makes the port platform independent.
     """
-    y32, x32 = np.asarray(y, np.float32), np.asarray(x, np.float32)
-    if _LIBM_ATAN2F is None:
-        return np.arctan2(y32, x32)
-    fn = _LIBM_ATAN2F
-    return np.array([fn(float(a), float(b)) for a, b in zip(y32, x32, strict=True)], np.float32)
+    y64 = np.asarray(y, np.float32).astype(np.float64)
+    x64 = np.asarray(x, np.float32).astype(np.float64)
+    return np.arctan2(y64, x64).astype(np.float32)
 
 
 def _int_word(i: int) -> float:
