@@ -34,6 +34,10 @@ python -m nastran95py.reference.inventory          # regenerate
 python -m nastran95py.reference.inventory --check  # fail if stale (CI)
 ```
 
+Golden values (displacements, SPC forces, element forces and stresses) parsed
+from the listings live in `tests/reference/golden/` with their comparison
+tolerance; see its [README](tests/reference/golden/README.md).
+
 ## Setup
 
 ```bash
