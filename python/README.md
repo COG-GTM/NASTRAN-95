@@ -8,13 +8,15 @@ against the compiled Fortran.
 inputs as the Fortran (MPT material records, CSTM coordinate records, EST/ECPT
 element records). It is *not* a replacement for the GINO/DMAP executive: the
 bulk-data reader (`nastran95py.bulk`) only builds ECPT records for the RF1 decks;
-there is no DMAP sequencing or matrix assembly here.
+`nastran95py.solve` assembles them into a minimal Rigid Format 1 static solve,
+but there is no DMAP sequencing, GINO I/O or grid point resequencing.
 
 | Subpackage | Fortran counterpart |
 |---|---|
 | `nastran95py.materials` | `MAT` in `mis/premat.f` (MAT1 isotropic, MAT2 anisotropic; `inflag` 1-4) |
 | `nastran95py.coords` | `TRANSS`/`TRANSD` (`mis/pretrs.f`, `mis/pretrd.f`), CSTM 14-word records |
 | `nastran95py.elements` | EST/ECPT record contract (`ElementData`, `EcptLayout`; ROD, BAR layouts) |
+| `nastran95py.solve` | RF1 static solve: SMA1 assembly, GP4/SCE1 SPCs, SSG1 loads, SSG3 solve, SDR1/SDR2 recovery |
 | `nastran95py.io` | 32-bit INTEGER/REAL word reinterpretation, Fortran `D` exponents |
 
 ## Reference baseline
@@ -39,11 +41,37 @@ Golden values (displacements, SPC forces, element forces and stresses) parsed
 from the listings live in `tests/reference/golden/` with their comparison
 tolerance; see its [README](tests/reference/golden/README.md).
 
+## RF1 static solve
+
+`nastran95py.solve.static` runs a deck end to end:
+
+```python
+from nastran95py.solve import solve_static
+
+sol = solve_static("../inp/d01161a.inp")  # path, deck text or StaticModel
+res = sol.subcases[10]
+res.grid_rows(res.displacement, [1, 9])  # (n, 6) T1..R3 per grid
+res.stresses["CTRMEM"].rows([11, 12])  # listing column order
+```
+
+It assembles `K_gg` with SciPy sparse (float64; the element kernels keep their
+REAL emulation), applies GRID/GRDSET `PS` and the subcase's SPC/SPC1 set (with
+enforced values), builds `P` from LOAD combinations of FORCE/MOMENT sets and the
+element thermal loads of `TEMPERATURE(LOAD|BOTH)` (TEMP/TEMPD), solves each
+SUBCASE with `scipy.sparse.linalg.spsolve` and recovers SPC forces, element
+stresses and element forces (CROD/CONROD, CSHEAR, CQDMEM2). DOFs with no
+stiffness and no load are constrained (GPSP); a loaded one or a mechanism raises
+`SingularStiffness`. MPC, OMIT/ASET, SUPORT, SPCD, DEFORM, subcase combinations
+and any card the bulk reader does not interpret raise `NotSupported`; PARAM,
+CNGRNT and POPT/PLIMIT are ignored (the fully stressed design loop is not run).
+`tests/test_solve_static.py` checks t01241a's assembled `K_gg` against KGGX and
+the d01011a, d01161a and d01032a listings.
+
 ## Setup
 
 ```bash
 cd python
-python -m pip install -e ".[dev]"   # Python 3.11+, NumPy, pytest, ruff
+python -m pip install -e ".[dev]"   # Python 3.11+, NumPy, SciPy, pytest, ruff
 ```
 
 ## Tests and parity

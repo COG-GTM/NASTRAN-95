@@ -63,8 +63,8 @@ jobs:
           python-version: "3.12"
       - name: Install gfortran
         run: sudo apt-get update && sudo apt-get install -y gfortran && gfortran --version
-      - name: Install nastran95py with numpy 1.26
-        run: python -m pip install -e ".[dev]" "numpy==1.26.*"
+      - name: Install nastran95py with numpy 1.26 (and a SciPy built for it)
+        run: python -m pip install -e ".[dev]" "numpy==1.26.*" "scipy>=1.11,<1.16"
       - name: Build Fortran harnesses
         run: make -C tests/fortran_kernels && make -C tests/fortran_harness
       - name: Pytest (rod kernels)
@@ -79,3 +79,5 @@ jobs:
         run: python -m pytest tests/test_qdmem2.py
       - name: Pytest (material temperature selection)
         run: python -m pytest tests/test_material_temperature.py
+      - name: Pytest (RF1 static solve)
+        run: python -m pytest tests/test_solve_static.py

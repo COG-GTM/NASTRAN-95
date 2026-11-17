@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nastran95py"
 version = "0.1.0"
-description = "Python port of NASTRAN-95 element routines, validated against the Fortran"
+description = "Python port of NASTRAN-95 element routines and a minimal RF1 static solve, validated against the Fortran"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "NASA Open Source Agreement 1.3" }
-dependencies = ["numpy>=1.26"]
+dependencies = ["numpy>=1.26", "scipy>=1.11"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
