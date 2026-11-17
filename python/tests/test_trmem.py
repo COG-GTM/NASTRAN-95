@@ -261,6 +261,14 @@ def test_temperature_dependent_material():
     np.testing.assert_allclose(k_hot, 0.75 * k_cold, rtol=1e-6, atol=1e-9 * np.abs(k_cold).max())
 
 
+def test_empty_batch():
+    for real_words in (True, False):
+        batch = TrmemBatch.from_elements([], MATS, real_words)
+        out = trmem_matrices(batch, CSTM, real_words)
+        assert out.k.shape == out.m.shape == (0, 9, 9) and out.sils.shape == (0, 3)
+        assert trmem_thermal_loads(batch, 100.0, CSTM, real_words) == []
+
+
 def test_degenerate_triangle_is_fatal():
     words = list(EMG_CASES[0].words)
     words[13:16] = words[9:12]  # grid B on top of grid A

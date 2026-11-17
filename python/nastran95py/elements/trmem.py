@@ -550,8 +550,10 @@ class TrmemBatch:
             props = list(materials)
         col = {
             name: np.array([getattr(p, name) for p in props], dtype=float)
-            for name in ("g", "alpha", "tref", "rho", "ge", "t", "nsm")
+            for name in ("tref", "rho", "ge", "t", "nsm")
         }
+        col["g"] = np.array([p.g for p in props], dtype=float).reshape(-1, 3, 3)
+        col["alpha"] = np.array([p.alpha for p in props], dtype=float).reshape(-1, 3)
         return cls(
             eid=np.array([d.eid for d in elements], dtype=np.int64),
             sil=np.array([d["sil"] for d in elements], dtype=np.int64).reshape(-1, 3),
