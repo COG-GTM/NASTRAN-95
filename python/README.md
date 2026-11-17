@@ -6,8 +6,9 @@ against the compiled Fortran.
 
 **Scope.** This is a library of element-level routines that take the same
 inputs as the Fortran (MPT material records, CSTM coordinate records, EST/ECPT
-element records). It is *not* a replacement for the GINO/DMAP executive: there
-is no bulk-data deck processing, DMAP sequencing or matrix assembly here.
+element records). It is *not* a replacement for the GINO/DMAP executive: the
+bulk-data reader (`nastran95py.bulk`) only builds ECPT records for the RF1 decks;
+there is no DMAP sequencing or matrix assembly here.
 
 | Subpackage | Fortran counterpart |
 |---|---|

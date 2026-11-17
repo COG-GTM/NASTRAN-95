@@ -1,9 +1,9 @@
-"""Minimal reader for NASTRAN-95 input decks, scoped to the RF1 deck inventory.
+"""Card reader for NASTRAN-95 input decks.
 
 Splits a deck into executive, case control and bulk data and parses bulk cards
-into named fields (fixed, large and free field, continuations). It does not
-resolve properties or build EST/ECPT records: the full bulk-data reader is
-UNT186-7, which will extend or replace this module.
+into named fields (fixed, large and free field, continuations). The typed bulk
+data model and ECPT construction built on these cards live in
+:mod:`nastran95py.bulk`.
 """
 
 from __future__ import annotations
