@@ -1,4 +1,5 @@
       SUBROUTINE PEXIT
+      EXTERNAL        LINK
 C
       INTEGER         HH,SS,DATE(3)
       COMMON /OUTPUT/ LE(17)
