@@ -38,3 +38,15 @@ def pytest_terminal_summary(terminalreporter):
     terminalreporter.write_line(header)
     for name, n, max_abs, max_rel in PARITY:
         terminalreporter.write_line(f"{name:<34}{n:>8}{max_abs:>14.3e}{max_rel:>14.3e}")
+
+
+@pytest.fixture(scope="session")
+def manifest():
+    from nastran95py.reference.inventory import load_manifest
+
+    return load_manifest()
+
+
+@pytest.fixture(scope="session")
+def decks(manifest):
+    return {d["id"]: d for d in manifest["decks"]}
