@@ -125,7 +125,7 @@ def _compare_emg(cases, dumps: dict, label: str) -> None:
 
 
 def _compare_sdr(cases, dumps: dict, label: str) -> None:
-    worst = {"phase1": _Worst(), "stress": _Worst()}
+    worst = {"phase1": _Worst(), "stress": _Worst(), "angle": _Worst()}
     for case in cases:
         data = _data(case)
         p1 = sqdm11(data, MATS, CSTM)
@@ -139,6 +139,8 @@ def _compare_sdr(cases, dumps: dict, label: str) -> None:
         assert R.real_word_as_int(want[0]) == data.eid
         # ANGLE comes from ATAN2 in REAL: libm atan2f may differ by an ulp across platforms.
         np.testing.assert_allclose(st.angle, want[4], rtol=2.5e-7, atol=1e-30)
+        a = abs(float(st.angle) - float(want[4]))
+        worst["angle"].add(a, a / abs(float(want[4])) if want[4] else a, 1)
         a, r = _err(np.delete(st.words(), 3), np.delete(want[1:], 3))
         assert r <= RTOL, (case.name, "stress", r)
         worst["stress"].add(a, r, 7)

@@ -16,8 +16,8 @@ def _run(**over) -> dict:
     ]
     records += [
         {"name": e, "n": 1, "max_abs": 0.0, "max_rel": 0.0, "element": e, "quantity": q,
-         "source": "golden"}
-        for e in P.ELEMENTS for q, _ in P.QUANTITIES
+         "source": s}
+        for e in P.ELEMENTS for q, _ in P.QUANTITIES for s in ("golden", "live")
     ]  # fmt: skip
     return {"exitstatus": 0, "records": records, "outcomes": [], **over}
 
@@ -43,6 +43,13 @@ def test_run_without_fortran_harness_is_rejected():
     run = _run()
     run["records"] = [r for r in run["records"] if r.get("element") != "CSHEAR"]
     with pytest.raises(P.ParityError, match="CSHEAR"):
+        P._validate(run)
+
+
+def test_run_without_live_harness_is_rejected():
+    run = _run()
+    run["records"] = [r for r in run["records"] if r.get("source") != "live"]
+    with pytest.raises(P.ParityError, match=r"CROD/CONROD K \(live\)"):
         P._validate(run)
 
 

@@ -135,7 +135,7 @@ def _check_angle(got: float, exp: float) -> None:
 
 def _check_sdr(golden: dict, label: str) -> None:
     p1 = qdmem2_stress_matrices(_batch(SDR), CSTM)
-    w = {k: _Worst() for k in ("phase1", "stress", "force")}
+    w = {k: _Worst() for k in ("phase1", "stress", "force", "angle")}
     for i, case in enumerate(SDR):
         words = golden[case.name]["words"]
         mine = p1.words(i)
@@ -152,9 +152,12 @@ def _check_sdr(golden: dict, label: str) -> None:
             if block == "stress" and label != "live":
                 got = got.copy()
                 _check_angle(got[4], exp[4])
+                w["angle"].add(got[4:5], exp[4:5])
                 got[4] = exp[4]
             w[block].add(got[1:], exp[1:])
     for block, x in w.items():
+        if x.n == 0:
+            continue
         record_parity(
             f"SQDM2{1 if block == 'phase1' else 2} {block} {label}", x.n, x.abs, x.rel,
             element="CQDMEM2", quantity="stress", source=harness_source(label),

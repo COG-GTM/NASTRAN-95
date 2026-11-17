@@ -74,8 +74,12 @@ def _validate(data: dict) -> None:
     decks = {r["deck"] for r in records if "deck" in r}
     if missing := sorted(set(RF1_DECKS) - decks):
         raise ParityError(f"no listing parity rows for decks {missing} (partial run?)")
-    have = {(r["element"], r["quantity"]) for r in records if r.get("source") == "golden"}
-    missing = [(e, q) for e in ELEMENTS for q, _ in QUANTITIES if (e, q) not in have]
+    have = {(r["element"], r["quantity"], r["source"]) for r in records if "source" in r}
+    missing = [
+        f"{e} {q} ({s})"
+        for s in ("golden", "live") for e in ELEMENTS for q, _ in QUANTITIES
+        if (e, q, s) not in have
+    ]  # fmt: skip
     if missing:
         raise ParityError(f"no harness parity rows for {missing} (gfortran missing?)")
 
