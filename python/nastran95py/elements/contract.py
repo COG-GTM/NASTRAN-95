@@ -192,4 +192,42 @@ BAR = EcptLayout(
     source="mis/kbar.f",
 )
 
-LAYOUTS: dict[str, EcptLayout] = {layout.element: layout for layout in (ROD, BAR)}
+
+def _membrane(element: str, ngrids: int, source: str, theta: bool = True) -> EcptLayout:
+    """Shear panel / membrane layout: EID, SILs, [THETA], MID, T, NSM, grids, ELTEMP."""
+    return EcptLayout(
+        element,
+        (
+            Field("eid", INT),
+            Field("sil", INT, ngrids),
+            *((Field("theta", REAL),) if theta else ()),
+            Field("mid", INT),
+            Field("t", REAL),
+            Field("nsm", REAL),
+        ),
+        ngrids=ngrids,
+        source=source,
+    )
+
+
+SHEAR = _membrane("SHEAR", 4, "mis/kpanel.f", theta=False)
+TRMEM = _membrane("TRMEM", 3, "mis/ktrmem.f")
+QDMEM = _membrane("QDMEM", 4, "mis/kqdmem.f")
+QDMEM1 = _membrane("QDMEM1", 4, "mis/qdmm1d.f")
+QDMEM2 = _membrane("QDMEM2", 4, "mis/qdmm2d.f")
+
+LAYOUTS: dict[str, EcptLayout] = {
+    layout.element: layout for layout in (ROD, BAR, SHEAR, TRMEM, QDMEM, QDMEM1, QDMEM2)
+}
+
+CARD_LAYOUTS: dict[str, str] = {
+    "CROD": "ROD",
+    "CONROD": "ROD",
+    "CBAR": "BAR",
+    "CSHEAR": "SHEAR",
+    "CTRMEM": "TRMEM",
+    "CQDMEM": "QDMEM",
+    "CQDMEM1": "QDMEM1",
+    "CQDMEM2": "QDMEM2",
+}
+"""Connection card -> ECPT layout (element type name as in the Fortran ``ELEM`` table)."""
