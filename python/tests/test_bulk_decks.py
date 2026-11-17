@@ -93,3 +93,21 @@ def test_decks_use_only_supported_or_known_cards():
     for deck_id in RF1_DECKS:
         model = BulkModel.from_deck(read_deck(_inp(deck_id)))
         assert set(model.ignored) <= known_unused, deck_id
+
+
+def test_d01011a_cshear_18_words():
+    """Expected words written out by hand from inp/d01011a.inp and kpanel.f.
+
+    CSHEAR 18 2 1 2 12 11; PSHEAR 2 MID 2 T .14; grids 1 (0,0,0), 2 (10,0,0),
+    12 (10,0,.82), 11 (0,0,.82). SIL = 6 * (position in sorted grid ids) + 1.
+    """
+    _, ecpts = read_ecpts(_inp("d01011a"))
+    rec = next(r for r in ecpts["SHEAR"] if r.data.eid == 18)
+    assert rec.words() == [
+        18, 1, 7, 43, 37, 2, 0.14, 0.0,
+        0, 0.0, 0.0, 0.0,
+        0, 10.0, 0.0, 0.0,
+        0, 10.0, 0.0, 0.82,
+        0, 0.0, 0.0, 0.82,
+        0.0,
+    ]  # fmt: skip
