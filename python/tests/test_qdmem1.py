@@ -130,7 +130,9 @@ def _compare_sdr(cases, dumps: dict, label: str) -> None:
         st = sqdm12(p1, case.extra[9:], _temperature(case))
         want = _real(dumps[case.name]["STRESS"])
         assert R.real_word_as_int(want[0]) == data.eid
-        a, r = _err(st.words(), want[1:])
+        # ANGLE comes from ATAN2 in REAL: libm atan2f may differ by an ulp across platforms.
+        np.testing.assert_allclose(st.angle, want[4], rtol=2.5e-7, atol=1e-30)
+        a, r = _err(np.delete(st.words(), 3), np.delete(want[1:], 3))
         assert r <= RTOL, (case.name, "stress", r)
         worst["stress"].add(a, r, 7)
         batch = qdmem1_stresses([data], MATS, case.extra[9:], CSTM, _temperature(case))
