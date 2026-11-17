@@ -288,7 +288,7 @@ def rod_stress_matrices(
     xyz = xyz.astype(dt)
 
     xn = xyz[:, 0] - xyz[:, 1]
-    xl = np.sqrt(xn[:, 0] ** 2 + xn[:, 1] ** 2 + xn[:, 2] ** 2)
+    xl = np.sqrt(xn[:, 0] * xn[:, 0] + xn[:, 1] * xn[:, 1] + xn[:, 2] * xn[:, 2])
     bad = ~(xl > 0.0) | (sil[:, 0] == sil[:, 1])
     if bad.any():
         raise RodGeometryError(
@@ -348,14 +348,16 @@ def srod1(
     ga, gb = data.grids
     xa, xb = ga.xyz.astype(dt), gb.xyz.astype(dt)
 
-    xn = [xa[i] - xb[i] for i in range(3)]
-    xl = xn[0] ** 2 + xn[1] ** 2 + xn[2] ** 2
-    xl = np.sqrt(xl)
+    # Each REAL operation is rounded explicitly so the result does not depend on
+    # NumPy's scalar promotion rules (NumPy 1.x promotes some float32 scalar ops).
+    xn = [dt(xa[i] - xb[i]) for i in range(3)]
+    xl = dt(dt(dt(xn[0] * xn[0]) + dt(xn[1] * xn[1])) + dt(xn[2] * xn[2]))
+    xl = dt(np.sqrt(xl))
     if not xl > 0.0 or sil[0] == sil[1]:
         raise RodGeometryError(f"rod element {data.eid} has illegal geometry or connections")
-    xn = [x / xl for x in xn]
-    eoverl = e / xl
-    gcovrl = g * jt / xl
+    xn = [dt(x / xl) for x in xn]
+    eoverl = dt(e / xl)
+    gcovrl = dt(dt(g * jt) / xl)
 
     def global_dir(gp, xyz) -> list:
         if gp.cid == 0:
@@ -365,7 +367,7 @@ def srod1(
         for j in range(3):
             s = dt(0.0)
             for k in range(3):
-                s = s + xn[k] * ti[k, j]
+                s = dt(s + dt(xn[k] * ti[k, j]))
             out.append(s)
         return out
 
@@ -374,14 +376,14 @@ def srod1(
     return RodStressMatrices(
         eid=data.eid,
         sil=sil,  # type: ignore[arg-type]
-        sat=f64([v * eoverl for v in na]),
-        sbt=f64([-v * eoverl for v in nb]),
-        sar=f64([v * gcovrl for v in na]),
-        sbr=f64([-v * gcovrl for v in nb]),
-        st=float(-alpha * e),
+        sat=f64([dt(v * eoverl) for v in na]),
+        sbt=f64([-dt(v * eoverl) for v in nb]),
+        sar=f64([dt(v * gcovrl) for v in na]),
+        sbr=f64([-dt(v * gcovrl) for v in nb]),
+        st=float(-dt(alpha * e)),
         sdelta=float(-eoverl),
         area=float(area),
-        c_over_j=float(c / jt) if jt != 0.0 else 0.0,
+        c_over_j=float(dt(c / jt)) if jt != 0.0 else 0.0,
         tref=float(dt(mat.tref)),
         sigma_t=float(dt(mat.sigt)),
         sigma_c=float(dt(mat.sigc)),
@@ -394,12 +396,12 @@ def _margins(sigma, tau, st, sc, ss, dt) -> tuple[float | None, float | None]:
     ms_sigma = None
     if sigma > 0.0:
         if st > 0.0:
-            ms_sigma = float(st / sigma - one)
+            ms_sigma = float(dt(dt(st / sigma) - one))
     elif sigma != 0.0 and sc > 0.0:
-        ms_sigma = float(-sc / sigma - one)
+        ms_sigma = float(dt(dt(-sc / sigma) - one))
     ms_tau = None
     if ss > 0.0 and tau != 0.0:
-        ms_tau = float(ss / abs(tau) - one)
+        ms_tau = float(dt(dt(ss / abs(tau)) - one))
     return ms_sigma, ms_tau
 
 
@@ -429,13 +431,13 @@ def srod2(
         np.asarray(v, dtype=float).astype(dt) for v in (p.sat, p.sbt, p.sar, p.sbr)
     )
     trana, tranb = dot(sat, ia), dot(sbt, ib)
-    sigma = trana + tranb + dt(p.sdelta) * dt(deformation)
+    sigma = dt(dt(trana + tranb) + dt(dt(p.sdelta) * dt(deformation)))
     if temperature is not None:
-        sigma = sigma + dt(p.st) * (dt(temperature) - dt(p.tref))
+        sigma = dt(sigma + dt(dt(p.st) * dt(dt(temperature) - dt(p.tref))))
     rota, rotb = dot(sar, ia + 3), dot(sbr, ib + 3)
-    torque = rota + rotb
-    force = dt(p.area) * sigma
-    tau = dt(p.c_over_j) * torque
+    torque = dt(rota + rotb)
+    force = dt(dt(p.area) * sigma)
+    tau = dt(dt(p.c_over_j) * torque)
     ms_sigma, ms_tau = _margins(sigma, tau, dt(p.sigma_t), dt(p.sigma_c), dt(p.sigma_s), dt)
     return RodStress(p.eid, float(sigma), ms_sigma, float(tau), ms_tau, float(force), float(torque))
 
