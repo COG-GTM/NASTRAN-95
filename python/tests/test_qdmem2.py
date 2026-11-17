@@ -42,7 +42,7 @@ from nastran95py.materials import Mat1, Mat2, MaterialTable
 from nastran95py.reference.cards import read_deck
 from nastran95py.reference.golden import compare, load_golden, tables
 from nastran95py.reference.inventory import repo_root
-from tests.conftest import record_parity
+from tests.conftest import harness_source, record_parity
 from tests.fortran_harness import cases as C
 from tests.fortran_harness import qdmem2_cases as QC
 from tests.fortran_harness import rod_cases as RC
@@ -116,8 +116,11 @@ def _check_emg(golden: dict, label: str) -> None:
             assert mats[1]["dict2"] == 1 and mats[2]["dict2"] == 2
             wk.add(el.stiffness.values, rnd(mats[1]["values"]))
             wm.add(el.mass.values, rnd(mats[2]["values"]))
-        record_parity(f"QDMM2{precision[0].upper()} K {label}", wk.n, wk.abs, wk.rel)
-        record_parity(f"QDMM2{precision[0].upper()} M {label}", wm.n, wm.abs, wm.rel)
+        for q, w in (("K", wk), ("M", wm)):
+            record_parity(
+                f"QDMM2{precision[0].upper()} {q} {label}", w.n, w.abs, w.rel,
+                element="CQDMEM2", quantity=q, source=harness_source(label),
+            )  # fmt: skip
 
 
 ANGLE_ULPS = 2
@@ -152,7 +155,10 @@ def _check_sdr(golden: dict, label: str) -> None:
                 got[4] = exp[4]
             w[block].add(got[1:], exp[1:])
     for block, x in w.items():
-        record_parity(f"SQDM2{1 if block == 'phase1' else 2} {block} {label}", x.n, x.abs, x.rel)
+        record_parity(
+            f"SQDM2{1 if block == 'phase1' else 2} {block} {label}", x.n, x.abs, x.rel,
+            element="CQDMEM2", quantity="stress", source=harness_source(label),
+        )  # fmt: skip
 
 
 def _check_loads(golden: dict, label: str) -> None:
@@ -162,7 +168,10 @@ def _check_loads(golden: dict, label: str) -> None:
     for case, load in zip(LOADS, res, strict=True):
         exp = np.asarray(golden[case.name]["load"])
         w.add(load.add_to(np.zeros(exp.size)), exp)
-    record_parity(f"QDMM2 thermal load {label}", w.n, w.abs, w.rel)
+    record_parity(
+        f"QDMM2 thermal load {label}", w.n, w.abs, w.rel,
+        element="CQDMEM2", quantity="load", source=harness_source(label),
+    )  # fmt: skip
 
 
 def test_matrices_match_fortran_golden():

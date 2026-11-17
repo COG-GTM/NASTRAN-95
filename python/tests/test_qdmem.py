@@ -44,7 +44,7 @@ from nastran95py.elements import (
 from nastran95py.materials import Mat1, Mat2, MaterialTable
 from nastran95py.reference.golden import compare, load_golden, tables, tolerances
 from nastran95py.reference.inventory import RF1_DECKS, load_manifest, repo_root
-from tests.conftest import record_parity
+from tests.conftest import harness_source, record_parity
 from tests.fortran_harness import cases as C
 from tests.fortran_harness import qdmem_cases as QC
 from tests.fortran_harness import rod_cases as RC
@@ -162,7 +162,10 @@ def _compare_matrices(fortran: dict, label: str) -> None:
                 worst[path].add(a, r, ref.size)
         name = "KQDMEM K" if key == "k" else "MASSTQ M"
         for path, w in worst.items():
-            record_parity(f"{name} {path} vs {label}", w.n, w.abs, w.rel)
+            record_parity(
+                f"{name} {path} vs {label}", w.n, w.abs, w.rel,
+                element="CQDMEM", quantity=key.upper(), source=harness_source(label),
+            )  # fmt: skip
 
 
 def _compare_loads(fortran: dict, label: str) -> None:
@@ -180,7 +183,10 @@ def _compare_loads(fortran: dict, label: str) -> None:
             assert r <= RTOL, (case.name, path, r)
             worst[path].add(a, r, want.size)
     for path, w in worst.items():
-        record_parity(f"QDMEM thermal load {path} vs {label}", w.n, w.abs, w.rel)
+        record_parity(
+            f"QDMEM thermal load {path} vs {label}", w.n, w.abs, w.rel,
+            element="CQDMEM", quantity="load", source=harness_source(label),
+        )  # fmt: skip
 
 
 def _load_args(case: C.Case):
@@ -222,7 +228,10 @@ def _compare_stress(fortran: dict, label: str) -> None:
             assert _angle_ok(ws[ANGLE], exps[ANGLE]), (case.name, path, ws[ANGLE], exps[ANGLE])
             worst["angle"].add(*_err(ws[ANGLE : ANGLE + 1], exps[ANGLE : ANGLE + 1]), 1)
     for block, w in worst.items():
-        record_parity(f"SQDME1/STQME2 {block} vs {label}", w.n, w.abs, w.rel)
+        record_parity(
+            f"SQDME1/STQME2 {block} vs {label}", w.n, w.abs, w.rel,
+            element="CQDMEM", quantity="stress", source=harness_source(label),
+        )  # fmt: skip
 
 
 def test_qdmem_matches_fortran_golden():

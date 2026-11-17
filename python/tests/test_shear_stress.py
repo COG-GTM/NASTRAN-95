@@ -34,7 +34,7 @@ from nastran95py.elements.shear_stress import (
 from nastran95py.materials import Mat1, MaterialTable
 from nastran95py.reference.golden import compare, load_golden, tables, tolerances
 from nastran95py.reference.inventory import load_manifest, repo_root
-from tests.conftest import record_parity
+from tests.conftest import harness_source, record_parity
 from tests.fortran_harness import cases as C
 from tests.fortran_harness import rod_cases as RC
 from tests.fortran_harness import runner as R
@@ -95,7 +95,10 @@ def _compare(fortran: dict, label: str) -> None:
             err = _err(got[c.name][block], fortran[c.name][block])
             assert err[1] <= RTOL, (c.name, block, err)
             worst = tuple(map(max, worst, err))
-        record_parity(f"SPANL1/SPANL2 {block} vs {label}", len(CASES), *worst)
+        record_parity(
+            f"SPANL1/SPANL2 {block} vs {label}", len(CASES), *worst,
+            element="CSHEAR", quantity="stress", source=harness_source(label),
+        )  # fmt: skip
 
 
 def test_shear_stress_matches_fortran_golden():

@@ -31,7 +31,7 @@ from nastran95py.elements import (
 from nastran95py.materials import Mat1, MaterialTable, Matt1, TableM1
 from nastran95py.reference.golden import load_golden
 from nastran95py.reference.inventory import RF1_DECKS, repo_root
-from tests.conftest import record_parity
+from tests.conftest import harness_source, record_parity
 from tests.fortran_harness import cases as C
 from tests.fortran_harness import rod_cases as RC
 from tests.fortran_harness import runner as R
@@ -75,6 +75,7 @@ def _data(case: C.Case) -> ElementData:
 def _compare(cases, dumps: dict, label: str) -> None:
     """Reference and batched Python paths vs Fortran EMGOUT dumps of ``cases``."""
     worst = {"ref": [0.0, 0.0, 0], "batch": [0.0, 0.0, 0]}
+    per_file = {1: [0.0, 0.0, 0], 2: [0.0, 0.0, 0]}
     for consistent in (False, True):
         group = [c for c in cases if (c.extra[0] > 0) == consistent]
         datas = [_data(c) for c in group]
@@ -96,8 +97,16 @@ def _compare(cases, dumps: dict, label: str) -> None:
                 for key, (a, r) in (("ref", (ra, rr)), ("batch", (ba, br))):
                     w = worst[key]
                     w[0], w[1], w[2] = max(w[0], a), max(w[1], r), w[2] + vals.size
+                    w = per_file[m["file"]]
+                    w[0], w[1], w[2] = max(w[0], a), max(w[1], r), w[2] + vals.size
     for key, (a, r, n) in worst.items():
         record_parity(f"rod {key} vs {label}", n, a, r)
+    for file, (a, r, n) in per_file.items():
+        quantity = "K" if file == 1 else "M"
+        record_parity(
+            f"rod {quantity} vs {label}", n, a, r,
+            element="CROD/CONROD", quantity=quantity, source=harness_source(label),
+        )  # fmt: skip
 
 
 def _reduce(full: np.ndarray, icode: int) -> np.ndarray:

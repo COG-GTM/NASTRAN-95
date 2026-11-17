@@ -38,7 +38,7 @@ from nastran95py.elements import (
 from nastran95py.materials import Mat1, Mat2, MaterialTable
 from nastran95py.reference.golden import compare, load_golden, tables
 from nastran95py.reference.inventory import load_manifest, repo_root
-from tests.conftest import record_parity
+from tests.conftest import harness_source, record_parity
 from tests.fortran_harness import cases as C
 from tests.fortran_harness import rod_cases as RC
 from tests.fortran_harness import runner as R
@@ -152,7 +152,10 @@ def _compare(fortran: dict[str, dict[str, np.ndarray]], label: str) -> None:
         for case in CASES:
             _compare_words(words[case.name], fortran[case.name], f"{path} {case.name}", worst)
         for block, (a, r, n) in worst.items():
-            record_parity(f"STRME1/STQME2 {block} {label} ({path})", n, a, r)
+            record_parity(
+                f"STRME1/STQME2 {block} {label} ({path})", n, a, r,
+                element="CTRMEM", quantity="stress", source=harness_source(label),
+            )  # fmt: skip
 
 
 def test_trmem_stress_matches_fortran_golden():

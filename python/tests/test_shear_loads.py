@@ -29,7 +29,7 @@ from nastran95py.elements import (
 )
 from nastran95py.materials import Mat1, MaterialTable
 from nastran95py.reference.inventory import repo_root
-from tests.conftest import record_parity
+from tests.conftest import harness_source, record_parity
 from tests.fortran_harness import cases as C
 from tests.fortran_harness import runner as R
 from tests.fortran_harness import shear_cases as SC
@@ -79,8 +79,9 @@ def _compare(fortran: list[np.ndarray], label: str) -> None:
             a, r = _err(p, f)
             worst_abs, worst_rel = max(worst_abs, a), max(worst_rel, r)
         record_parity(
-            f"CSHEAR loads {label} ({name})", sum(f.size for f in fortran), worst_abs, worst_rel
-        )
+            f"CSHEAR loads {label} ({name})", sum(f.size for f in fortran), worst_abs, worst_rel,
+            element="CSHEAR", quantity="load", source=harness_source(label),
+        )  # fmt: skip
 
 
 def test_shear_loads_match_fortran_golden():

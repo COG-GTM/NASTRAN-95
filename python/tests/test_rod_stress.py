@@ -35,7 +35,7 @@ from nastran95py.elements.rod_stress import NO_MARGIN_WORD
 from nastran95py.materials import Mat1, MaterialTable
 from nastran95py.reference.golden import GoldenTable, compare, load_golden, tables
 from nastran95py.reference.inventory import load_manifest, repo_root
-from tests.conftest import record_parity
+from tests.conftest import harness_source, record_parity
 from tests.fortran_harness import cases as C
 from tests.fortran_harness import rod_cases as RC
 from tests.fortran_harness import rod_stress_cases as SC
@@ -135,7 +135,10 @@ def _compare(fortran: dict[str, dict[str, np.ndarray]], label: str) -> None:
                 w = worst[block]
                 w[0], w[1], w[2] = max(w[0], a), max(w[1], r), w[2] + exp.size
         for block, (a, r, n) in worst.items():
-            record_parity(f"SROD {block} {label} ({path})", n, a, r)
+            record_parity(
+                f"SROD {block} {label} ({path})", n, a, r,
+                element="CROD/CONROD", quantity="stress", source=harness_source(label),
+            )  # fmt: skip
 
 
 def test_rod_stress_matches_fortran_golden():

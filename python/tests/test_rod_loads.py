@@ -34,7 +34,7 @@ from nastran95py.elements import (
 from nastran95py.materials import Mat1, MaterialTable
 from nastran95py.reference.cards import read_deck
 from nastran95py.reference.inventory import repo_root
-from tests.conftest import record_parity
+from tests.conftest import harness_source, record_parity
 from tests.fortran_harness import cases as C
 from tests.fortran_harness import rod_cases as RC
 from tests.fortran_harness import rod_load_cases as LC
@@ -102,8 +102,9 @@ def _compare(fortran: list[np.ndarray], label: str) -> None:
             a, r = _err(p, f)
             worst_abs, worst_rel = max(worst_abs, a), max(worst_rel, r)
         record_parity(
-            f"ROD loads {label} ({name})", sum(f.size for f in fortran), worst_abs, worst_rel
-        )
+            f"ROD loads {label} ({name})", sum(f.size for f in fortran), worst_abs, worst_rel,
+            element="CROD/CONROD", quantity="load", source=harness_source(label),
+        )  # fmt: skip
 
 
 def test_rod_loads_match_fortran_golden():
