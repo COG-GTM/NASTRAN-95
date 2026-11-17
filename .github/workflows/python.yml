@@ -69,3 +69,5 @@ jobs:
         run: make -C tests/fortran_kernels && make -C tests/fortran_harness
       - name: Pytest (rod kernels)
         run: python -m pytest tests/test_rod.py tests/test_rod_loads.py tests/test_rod_stress.py
+      - name: Pytest (CTRMEM kernels)
+        run: python -m pytest tests/test_trmem.py tests/test_trmem_stress.py
