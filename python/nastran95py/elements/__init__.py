@@ -74,6 +74,20 @@ from nastran95py.elements.trmem import (
     trmem_thermal_loads,
     trmemd,
 )
+from nastran95py.elements.trmem_stress import (
+    MembraneStresses,
+    TrmemStress,
+    TrmemStressBatch,
+    TrmemStressMatrices,
+    membrane_stress_matrices,
+    membrane_stresses,
+    stqme2,
+    strme1,
+    thermal_stress_vector,
+    transs,
+    trmem_stress_matrices,
+    trmem_stresses,
+)
 
 __all__ = [
     "CARD_LAYOUTS",
@@ -136,4 +150,16 @@ __all__ = [
     "trmem_properties",
     "trmem_thermal_loads",
     "trmemd",
+    "MembraneStresses",
+    "TrmemStress",
+    "TrmemStressBatch",
+    "TrmemStressMatrices",
+    "membrane_stress_matrices",
+    "membrane_stresses",
+    "stqme2",
+    "strme1",
+    "thermal_stress_vector",
+    "transs",
+    "trmem_stress_matrices",
+    "trmem_stresses",
 ]

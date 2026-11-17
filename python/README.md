@@ -96,3 +96,10 @@ rod stress recovery cases (coordinate systems, MAT1 limits, load temperature,
 `DEFORM`) and regenerates `golden/rod_stress_golden.json`, used by
 `tests/test_rod_stress.py` with the SROD cases of `harness_golden.json` and the
 rod stress/force tables of the listings (d01161a, d01013a).
+
+`python -m tests.fortran_harness.trmem_stress_cases` reruns the `strme1`/`stqme2`
+CTRMEM stress recovery cases (coordinate systems, material angles, load
+temperature, zero stress) and regenerates `golden/trmem_stress_golden.json`, used
+by `tests/test_trmem_stress.py` with the STRME cases of `harness_golden.json` and
+the "STRESSES IN TRIANGULAR MEMBRANES" tables of the listings (d01011a, d01012a,
+d01013a, d01014a, d01161a).
