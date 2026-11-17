@@ -1,5 +1,7 @@
 """MATT1 is ignored without a material temperature set (``PREMAT``: TEMPID = 0)."""
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -16,6 +18,7 @@ from nastran95py.elements import (
     trimem,
     trmemd,
 )
+from nastran95py.elements.contract import LAYOUTS
 
 BULK = (
     "GRID    1               0.      0.      0.",
@@ -98,3 +101,27 @@ def test_load_only_set_applies_thermal_loads_with_plain_mat1():
     for plain, with_matt1 in zip(*out, strict=True):
         assert np.abs(plain).max() > 0.0
         np.testing.assert_array_equal(with_matt1, plain)
+
+
+@pytest.mark.parametrize("raw", [False, True])
+@pytest.mark.parametrize("eid", [1, 2, 3, 4, 5, 6])
+def test_ecpt_round_trip_keeps_no_material_temperature(eid, raw):
+    model, recs = _read("", matt1=True)
+    plain = _stiffness(eid, *_read("", matt1=False))
+    data = recs[eid].data
+    layout = LAYOUTS[data.element]
+    words = layout.pack(data, raw=raw)
+    back = layout.parse(words, raw=raw, material_temperature=data.temperature is not None)
+    assert back.temperature is None
+    assert layout.pack(back, raw=raw) == words
+    np.testing.assert_array_equal(
+        _stiffness(eid, model, {eid: replace(recs[eid], data=back)}), plain
+    )
+
+
+def test_ecpt_round_trip_keeps_material_temperature():
+    model, recs = _read("TEMPERATURE(MATERIAL) = 9\n", matt1=True)
+    data = recs[6].data
+    back = LAYOUTS["QDMEM2"].parse(LAYOUTS["QDMEM2"].pack(data))
+    assert back.temperature == pytest.approx(data.temperature)
+    assert back.temperature != 0.0

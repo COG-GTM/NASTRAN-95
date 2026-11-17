@@ -93,11 +93,20 @@ class EcptLayout:
             + sum(f.count for f in self.trailer)
         )
 
-    def parse(self, words: Sequence[int | float], raw: bool = False) -> ElementData:
+    def parse(
+        self, words: Sequence[int | float], raw: bool = False, material_temperature: bool = True
+    ) -> ElementData:
         """Decode a flat ECPT array.
 
         With ``raw=True`` the words are 32-bit patterns (signed int32) as stored
         by the Fortran, and REAL fields are reinterpreted from their bits.
+
+        ``material_temperature`` says whether a material temperature set is
+        selected (``TEMPID`` nonzero). The ECPT word alone cannot tell: TA1ETD
+        writes 0.0 without a set, and ``PREMAT`` then ignores MATT1 whatever the
+        word holds. With ``False`` the decoded ``temperature`` is ``None``, so
+        ``parse(pack(d), material_temperature=d.temperature is not None)``
+        round-trips.
         """
         if len(words) != self.length:
             raise ValueError(f"{self.element} ECPT needs {self.length} words, got {len(words)}")
@@ -121,7 +130,8 @@ class EcptLayout:
             grids.append(GridPoint(cid, np.array(xyz)))
             pos += GRID_BLOCK_WORDS
         extra = {f.name: take(f) for f in self.trailer}
-        temperature = float(extra.pop("eltemp", 0.0))  # type: ignore[arg-type]
+        eltemp = float(extra.pop("eltemp", 0.0))  # type: ignore[arg-type]
+        temperature = eltemp if material_temperature else None
         return ElementData(self.element, fields, grids, temperature, extra)
 
     def pack(self, data: ElementData, raw: bool = False) -> list[int | float]:
