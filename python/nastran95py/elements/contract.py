@@ -167,6 +167,20 @@ ROD = EcptLayout(
     source="mis/krod.f",
 )
 
+TUBE = EcptLayout(
+    "TUBE",
+    (
+        Field("eid", INT),
+        Field("sil", INT, 2),
+        Field("mid", INT),
+        Field("od", REAL),
+        Field("t", REAL),
+        Field("nsm", REAL),
+    ),
+    ngrids=2,
+    source="mis/rod.f",
+)
+
 BAR = EcptLayout(
     "BAR",
     (
@@ -217,7 +231,7 @@ QDMEM1 = _membrane("QDMEM1", 4, "mis/qdmm1d.f")
 QDMEM2 = _membrane("QDMEM2", 4, "mis/qdmm2d.f")
 
 LAYOUTS: dict[str, EcptLayout] = {
-    layout.element: layout for layout in (ROD, BAR, SHEAR, TRMEM, QDMEM, QDMEM1, QDMEM2)
+    layout.element: layout for layout in (ROD, TUBE, BAR, SHEAR, TRMEM, QDMEM, QDMEM1, QDMEM2)
 }
 
 CARD_LAYOUTS: dict[str, str] = {

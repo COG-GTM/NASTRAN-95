@@ -72,3 +72,8 @@ It links the unmodified RF1 element routines (EMG `rods/rodd`, `shears/sheard`,
 `python -m tests.fortran_harness.runner` regenerates `golden/harness_golden.json`
 (`python -m tests.fortran_harness.rod_cases` regenerates the coordinate-system
 RODD cases in `golden/rod_golden.json`, used by `tests/test_rod.py`).
+
+`build/rodload` (same directory) links `mis/rod.f`, the EDTL thermal and
+`DEFORM` load routine for ROD/CONROD/TUBE, with `basglb`/`mpyl` and the
+SSGETD/FEDT/CSTM stubs in `loadstubs.f`; `python -m tests.fortran_harness.rod_load_cases`
+regenerates `golden/rod_load_golden.json`, used by `tests/test_rod_loads.py`.
