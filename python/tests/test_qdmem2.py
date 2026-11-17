@@ -120,6 +120,16 @@ def _check_emg(golden: dict, label: str) -> None:
         record_parity(f"QDMM2{precision[0].upper()} M {label}", wm.n, wm.abs, wm.rel)
 
 
+ANGLE_ULPS = 2
+
+
+def _check_angle(got: float, exp: float) -> None:
+    """The principal angle is REAL ``ATAN2`` (libm ``atan2f``), whose last bit varies
+    between C libraries: stored goldens allow ``ANGLE_ULPS`` float32 ulps on it, while
+    the live harness (same libm as the port) must match exactly."""
+    assert abs(got - exp) <= ANGLE_ULPS * abs(np.spacing(np.float32(exp))), (got, exp)
+
+
 def _check_sdr(golden: dict, label: str) -> None:
     p1 = qdmem2_stress_matrices(_batch(SDR), CSTM)
     w = {k: _Worst() for k in ("phase1", "stress", "force")}
@@ -136,6 +146,10 @@ def _check_sdr(golden: dict, label: str) -> None:
         for block, got in (("stress", s.stress_words(0)), ("force", s.force_words(0))):
             exp = _real(words[block.upper()])
             assert R.real_word_as_int(exp[0]) == case.words[0]
+            if block == "stress" and label != "live":
+                got = got.copy()
+                _check_angle(got[4], exp[4])
+                got[4] = exp[4]
             w[block].add(got[1:], exp[1:])
     for block, x in w.items():
         record_parity(f"SQDM2{1 if block == 'phase1' else 2} {block} {label}", x.n, x.abs, x.rel)
@@ -275,8 +289,9 @@ def test_constant_strain_patch_stress():
         p1 = sqdm21(_data(case), MATS)
         disp, _ = _sdr_load(case)
         s = sqdm22(p1, disp).stress[0]
-        ref = _golden()[case.name]["words"]["STRESS"][1:8]
-        np.testing.assert_allclose(s, _real(ref), rtol=RTOL)
+        ref = _real(_golden()[case.name]["words"]["STRESS"][1:8])
+        _check_angle(s[3], ref[3])
+        np.testing.assert_allclose(np.delete(s, 3), np.delete(ref, 3), rtol=RTOL)
 
 
 def test_free_thermal_expansion_is_stress_free_and_balanced():

@@ -41,6 +41,8 @@ pivot triangles have different areas.
 
 from __future__ import annotations
 
+import ctypes
+import ctypes.util
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -95,6 +97,34 @@ def _cross(a, b):
         ],
         axis=-1,
     )
+
+
+def _load_atan2f():
+    name = ctypes.util.find_library("m")
+    try:
+        fn = ctypes.CDLL(name).atan2f if name else None
+    except (OSError, AttributeError):
+        fn = None
+    if fn is not None:
+        fn.restype = ctypes.c_float
+        fn.argtypes = [ctypes.c_float, ctypes.c_float]
+    return fn
+
+
+_LIBM_ATAN2F = _load_atan2f()
+
+
+def _atan2f(y, x):
+    """REAL ``ATAN2``: the C library's ``atan2f``, as gfortran calls it.
+
+    Its last bit depends on the libm build, and NumPy's float32 SIMD kernel can differ
+    from it by an ulp, so the libm routine is called directly when it can be found.
+    """
+    y, x = np.asarray(y, f32), np.asarray(x, f32)
+    if _LIBM_ATAN2F is None:
+        return np.arctan2(y.astype(f64), x.astype(f64)).astype(f32)
+    out = [_LIBM_ATAN2F(float(a), float(b)) for a, b in zip(y.ravel(), x.ravel(), strict=True)]
+    return np.asarray(out, f32).reshape(y.shape)
 
 
 def _mm(a, b):
@@ -882,7 +912,7 @@ def qdmem2_stresses(
         phi = np.where(
             np.abs(temp) < tiny,
             np.where(np.abs(delta) < tiny, f32(45.0), f32(0.0)),
-            np.arctan2(delta, temp) * _PHI,
+            _atan2f(delta, temp) * _PHI,
         ).astype(f32)
     stress = np.stack([sx, sy, txy, phi, major, minor, tau], axis=1).astype(float)
     return Qdmem2Stresses(p1.eid.copy(), stress, f.astype(float), kick.astype(float))
