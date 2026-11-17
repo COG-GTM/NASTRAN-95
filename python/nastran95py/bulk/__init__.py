@@ -7,7 +7,7 @@ from nastran95py.bulk.ecpt import (
     material_temperature_set,
     read_ecpts,
 )
-from nastran95py.bulk.loads import deformations, load_temperatures
+from nastran95py.bulk.loads import deformations, load_grid_temperatures, load_temperatures
 from nastran95py.bulk.model import (
     BulkDataError,
     BulkModel,
@@ -33,6 +33,7 @@ __all__ = [
     "build_ecpt",
     "build_ecpts",
     "deformations",
+    "load_grid_temperatures",
     "load_temperatures",
     "material_temperature_set",
     "point_to_basic",

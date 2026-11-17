@@ -54,6 +54,16 @@ from nastran95py.elements.rod_loads import (
     rod_loads,
     tube_area,
 )
+from nastran95py.elements.rod_stress import (
+    RodStress,
+    RodStressBatch,
+    RodStressMatrices,
+    RodStressResults,
+    rod_stress_matrices,
+    rod_stresses,
+    srod1,
+    srod2,
+)
 from nastran95py.elements.shear import (
     ShearBatch,
     ShearBatchMatrices,
@@ -63,6 +73,12 @@ from nastran95py.elements.shear import (
     shear_matrices,
     shear_properties,
     sheard,
+)
+from nastran95py.elements.shear_loads import (
+    ShearLoad,
+    ShearLoadBatch,
+    shear_load,
+    shear_loads,
 )
 from nastran95py.elements.trmem import (
     TriangleGeometry,
@@ -102,8 +118,14 @@ __all__ = [
     "ShearBatch",
     "ShearBatchMatrices",
     "ShearGeometryError",
+    "ShearLoad",
+    "ShearLoadBatch",
     "ShearMatrices",
     "ShearProperties",
+    "RodStress",
+    "RodStressBatch",
+    "RodStressMatrices",
+    "RodStressResults",
     "assemble",
     "load_vector",
     "real_cstm",
@@ -111,8 +133,14 @@ __all__ = [
     "rod_loads",
     "rod_matrices",
     "rod_properties",
+    "rod_stress_matrices",
+    "rod_stresses",
     "rodd",
+    "srod1",
+    "srod2",
     "tube_area",
+    "shear_load",
+    "shear_loads",
     "shear_matrices",
     "shear_properties",
     "sheard",

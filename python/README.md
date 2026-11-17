@@ -91,6 +91,18 @@ printed displacements never cover a whole element). Note that `QDMM1D`/`QDMM1S`
 take DEGRA from word 5 of `/CONDAS/` (4 pi^2), so their MAT2 material angle is
 `THETA * 4 pi^2` radians; the port reproduces this (`qdmm1d_material_angle`).
 
+`build/tshearld` links `mis/tshear.f`, the EDTL thermal load routine for CSHEAR
+(pseudo-rods on the four panel edges), against the same `basglb`/`mpyl` and
+`loadstubs.f` stubs (SSGETD also returns the grid temperatures `TI(2..5)`);
+`python -m tests.fortran_harness.shear_load_cases` regenerates
+`golden/shear_load_golden.json`, used by `tests/test_shear_loads.py`.
+
 `python -m tests.fortran_harness.shear_cases` regenerates the SHEARD cases
 (every flexibility branch, warped/skewed/CSTM panels, and the MESAGE 2026/2027
 exits) in `golden/shear_golden.json`, used by `tests/test_shear.py`.
+
+`python -m tests.fortran_harness.rod_stress_cases` reruns the `srod1`/`srod2`
+rod stress recovery cases (coordinate systems, MAT1 limits, load temperature,
+`DEFORM`) and regenerates `golden/rod_stress_golden.json`, used by
+`tests/test_rod_stress.py` with the SROD cases of `harness_golden.json` and the
+rod stress/force tables of the listings (d01161a, d01013a).

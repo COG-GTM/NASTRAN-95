@@ -46,3 +46,26 @@ jobs:
           fi
       - name: Pytest
         run: python -m pytest
+
+  # Oldest NumPy pyproject allows (1.x scalar promotion rules): the rod kernels'
+  # REAL-emulating scalar and batched paths must stay bit-identical there too.
+  test-numpy126:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python
+    env:
+      NASTRAN95PY_REQUIRE_FORTRAN: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install gfortran
+        run: sudo apt-get update && sudo apt-get install -y gfortran && gfortran --version
+      - name: Install nastran95py with numpy 1.26
+        run: python -m pip install -e ".[dev]" "numpy==1.26.*"
+      - name: Build Fortran harnesses
+        run: make -C tests/fortran_kernels && make -C tests/fortran_harness
+      - name: Pytest (rod kernels)
+        run: python -m pytest tests/test_rod.py tests/test_rod_loads.py tests/test_rod_stress.py tests/test_qdmem1.py
