@@ -1,7 +1,7 @@
 # Element-level parity harness: the unmodified RF1 element routines from mis/
 # (EMG, SMA1 and SDR2 paths for CROD/CONROD, CSHEAR, CTRMEM, CQDMEM, CQDMEM1,
-# CQDMEM2) linked against GINO/executive stubs and a driver that fills the
-# EST/ECPT record and prints the element matrices and stress/force words.
+# CQDMEM2, plus the CTRMEM thermal load TRIMEM) linked against GINO/executive
+# stubs and a driver that fills the EST/ECPT record and prints the element matrices and stress/force words.
 ifeq ($(origin FC),default)
 FC      := gfortran
 endif
@@ -15,11 +15,12 @@ ELEMENTS := krod rods rodd shears sheard ktrmem trmems trmemd kqdmem ktriqd \
             qdmm1s qdmm1d qdmm2s qdmm2d
 STRESS   := srod1 srod2 spanl1 spanl2 strme1 sqdme1 sqdm11 sqdm12 sqdm21 sqdm22 \
             stqme2
+LOADS    := trimem
 SUPPORT  := premat pretrs pretrd gmmats gmmatd emastq emadtq ektrms ektrmd \
             q2trms q2bcs q2trmd q2bcd smmats saxb sadotb dadotb daxb invers \
-            inverd sdrchk sort
+            inverd sdrchk sort mpyl basglb
 
-OBJECTS := $(addprefix $(BUILD)/,$(addsuffix .o,$(ELEMENTS) $(STRESS) $(SUPPORT))) \
+OBJECTS := $(addprefix $(BUILD)/,$(addsuffix .o,$(ELEMENTS) $(STRESS) $(LOADS) $(SUPPORT))) \
            $(BUILD)/khrfn1.o $(BUILD)/kstubs.o $(BUILD)/stubs.o $(BUILD)/driver.o
 
 all: $(BUILD)/harness

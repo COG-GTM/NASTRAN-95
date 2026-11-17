@@ -67,11 +67,14 @@ The element-level harness lives in `tests/fortran_harness/`; CI runs
 It links the unmodified RF1 element routines (EMG `rods/rodd`, `shears/sheard`,
 `trmems/trmemd`, `qdmm1s/d`, `qdmm2s/d`; SMA1 `krod`, `ktrmem`, `kqdmem`,
 `ktriqd`; SDR2 `srod1/2`, `spanl1/2`, `strme1`, `sqdme1`, `sqdm11/12/21/22`,
-`stqme2`) and dumps K, M and stress/force words for the hand-built cases in
+`stqme2`; the CTRMEM thermal load `trimem`) and dumps K, M, loads and
+stress/force words for the hand-built cases in
 `tests/fortran_harness/cases.py` (`tests/test_fortran_harness.py`);
 `python -m tests.fortran_harness.runner` regenerates `golden/harness_golden.json`
 (`python -m tests.fortran_harness.rod_cases` regenerates the coordinate-system
-RODD cases in `golden/rod_golden.json`, used by `tests/test_rod.py`).
+RODD cases in `golden/rod_golden.json`, used by `tests/test_rod.py`;
+`python -m tests.fortran_harness.trmem_cases` regenerates the CTRMEM
+`TRMEMD`/`TRIMEM` cases in `golden/trmem_golden.json`, used by `tests/test_trmem.py`).
 
 `build/rodload` (same directory) links `mis/rod.f`, the EDTL thermal and
 `DEFORM` load routine for ROD/CONROD/TUBE, with `basglb`/`mpyl` and the
