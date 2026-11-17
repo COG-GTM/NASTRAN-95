@@ -93,3 +93,14 @@ all: $(BUILD)/qdmemx
 
 $(BUILD)/qdmemx: $(QDMEMX_OBJECTS)
 	$(FC) $(FFLAGS) $^ -o $@
+
+# CQDMEM2 thermal load (mis/qdmm2.f as called from EDTL): same stubs and
+# CSTMRD-renamed BASGLB as the rod load harness.
+QDMM2LOAD_OBJECTS := $(addprefix $(BUILD)/,qdmm2.o q2bcs.o q2trms.o invers.o gmmats.o saxb.o \
+                  sadotb.o basglb_cs.o mpyl.o premat.o sort.o khrfn1.o kstubs.o \
+                  loadstubs.o qdmm2load.o)
+
+all: $(BUILD)/qdmm2load
+
+$(BUILD)/qdmm2load: $(QDMM2LOAD_OBJECTS)
+	$(FC) $(FFLAGS) $^ -o $@

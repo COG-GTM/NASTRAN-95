@@ -128,3 +128,11 @@ mass on `build/qdmemx` (`qdmemx.f`, with the `basglb`/`loadstubs.f` CSTM stub).
 `tests/test_qdmem.py` checks `nastran95py.elements.qdmem` against them, the
 CQDMEM cases of `harness_golden.json`, and the "STRESSES IN QUADRILATERAL
 MEMBRANES" tables of the listings (d01011a, d01161a).
+
+`build/qdmm2load` links `mis/qdmm2.f`, the CQDMEM2 thermal load called from
+`EDTL`, with `q2bcs`/`q2trms`/`invers` and the same `loadstubs.f`/CSTMRD
+`basglb` as `build/rodload`. `python -m tests.fortran_harness.qdmem2_cases`
+regenerates `golden/qdmem2_golden.json` (warped and planar quadrilaterals,
+permuted SILs, material angles, NSM, rectangular/cylindrical/spherical grid
+systems, `SQDM21`/`SQDM22` with and without a load temperature, and `QDMM2`),
+used by `tests/test_qdmem2.py` for `nastran95py.elements.qdmem2`.

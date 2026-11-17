@@ -75,3 +75,5 @@ jobs:
         run: python -m pytest tests/test_qdmem1.py
       - name: Pytest (CQDMEM kernels)
         run: python -m pytest tests/test_qdmem.py
+      - name: Pytest (CQDMEM2 kernels)
+        run: python -m pytest tests/test_qdmem2.py
