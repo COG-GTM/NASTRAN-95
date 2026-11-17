@@ -44,6 +44,8 @@ The ``NCHK`` precision check of ``STQME2`` (a diagnostic print) and the
 
 from __future__ import annotations
 
+import ctypes
+import ctypes.util
 import struct
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -64,6 +66,35 @@ ANGLE_FACTOR = 28.6478898
 """``STQME2`` constant: degrees per radian over 2 (the half-angle of Mohr's circle)."""
 NO_TEMPERATURE = np.nan
 """Load temperature of a subcase without TEMPERATURE(LOAD) (``LDTEMP = -1``)."""
+
+
+def _load_atan2f():
+    name = ctypes.util.find_library("m")
+    try:
+        fn = ctypes.CDLL(name).atan2f if name else None
+    except (AttributeError, OSError):
+        fn = None
+    if fn is not None:
+        fn.restype = ctypes.c_float
+        fn.argtypes = [ctypes.c_float, ctypes.c_float]
+    return fn
+
+
+_LIBM_ATAN2F = _load_atan2f()
+
+
+def _atan2f(y: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """REAL ``ATAN2``: the C library's ``atan2f``, which gfortran calls.
+
+    NumPy's float32 ``arctan2`` is dispatched to CPU-dependent SIMD kernels and
+    differs from libm by 1 ulp on some runners, so libm is called directly
+    (falling back to NumPy where no libm is found).
+    """
+    y32, x32 = np.asarray(y, np.float32), np.asarray(x, np.float32)
+    if _LIBM_ATAN2F is None:
+        return np.arctan2(y32, x32)
+    fn = _LIBM_ATAN2F
+    return np.array([fn(float(a), float(b)) for a, b in zip(y32, x32, strict=True)], np.float32)
 
 
 def _int_word(i: int) -> float:
@@ -424,7 +455,8 @@ def membrane_stresses(
     delta = two * txy
     tiny = dt(1.0e-15)
     flat = (np.abs(delta) < tiny) & (np.abs(temp) < tiny)
-    angle = np.where(flat, dt(0.0), np.arctan2(delta, temp) * dt(ANGLE_FACTOR)).astype(dt)
+    phi = _atan2f(delta, temp) if real_words else np.arctan2(delta, temp)
+    angle = np.where(flat, dt(0.0), phi * dt(ANGLE_FACTOR)).astype(dt)
     return MembraneStresses(
         batch.eid.copy(),
         *(v.astype(float) for v in (sx, sy, txy, angle, centre + rad, centre - rad, rad)),
