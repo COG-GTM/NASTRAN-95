@@ -22,9 +22,9 @@ C             SDR2 OUTPUT (ELEMENT IDS) PRINT AS THEIR REAL BIT PATTERN.
 C
       PROGRAM ELHARN
       INTEGER          IZ(300000),BFR(10),N2MAT,KIND,N,IFLAG(400)
-      REAL             R(16),VAL(400),WORDS(400)
+      REAL             R(16),WORDS(400)
       INTEGER          IWORDS(400)
-      DOUBLE PRECISION DVAL(400)
+      DOUBLE PRECISION DVAL(400),XVAL(400)
       CHARACTER*8      NAME,NAME2
       COMMON /ZZZZZZ/  Z(300000)
       COMMON /SYSTEM/  ISYS(100)
@@ -91,12 +91,12 @@ C
       DO 900 IC = 1,NCASE
       READ (*,*) KIND,NAME,N
       READ (*,*) (IFLAG(J),J=1,N)
-      READ (*,*) (VAL(J),J=1,N)
+      READ (*,*) (XVAL(J),J=1,N)
       DO 40 J = 1,N
       IF (IFLAG(J) .EQ. 1) THEN
-         IWORDS(J) = NINT(VAL(J))
+         IWORDS(J) = NINT(XVAL(J))
       ELSE
-         WORDS(J) = VAL(J)
+         WORDS(J) = REAL(XVAL(J))
       END IF
    40 CONTINUE
       WRITE (*,'(A,2I6,1X,A)') 'CASE',IC,KIND,NAME
