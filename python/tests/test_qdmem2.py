@@ -42,7 +42,7 @@ from nastran95py.materials import Mat1, Mat2, MaterialTable
 from nastran95py.reference.cards import read_deck
 from nastran95py.reference.golden import compare, load_golden, tables
 from nastran95py.reference.inventory import repo_root
-from tests.conftest import record_parity
+from tests.conftest import harness_source, record_parity
 from tests.fortran_harness import cases as C
 from tests.fortran_harness import qdmem2_cases as QC
 from tests.fortran_harness import rod_cases as RC
@@ -96,8 +96,9 @@ class _Worst:
     def __init__(self):
         self.abs, self.rel, self.n = 0.0, 0.0, 0
 
-    def add(self, got, exp):
-        np.testing.assert_allclose(got, exp, rtol=RTOL, atol=0.0)
+    def add(self, got, exp, check=True):
+        if check:
+            np.testing.assert_allclose(got, exp, rtol=RTOL, atol=0.0)
         a, r = _err(got, exp)
         self.abs, self.rel, self.n = max(self.abs, a), max(self.rel, r), self.n + np.size(exp)
 
@@ -116,8 +117,11 @@ def _check_emg(golden: dict, label: str) -> None:
             assert mats[1]["dict2"] == 1 and mats[2]["dict2"] == 2
             wk.add(el.stiffness.values, rnd(mats[1]["values"]))
             wm.add(el.mass.values, rnd(mats[2]["values"]))
-        record_parity(f"QDMM2{precision[0].upper()} K {label}", wk.n, wk.abs, wk.rel)
-        record_parity(f"QDMM2{precision[0].upper()} M {label}", wm.n, wm.abs, wm.rel)
+        for q, w in (("K", wk), ("M", wm)):
+            record_parity(
+                f"QDMM2{precision[0].upper()} {q} {label}", w.n, w.abs, w.rel,
+                element="CQDMEM2", quantity=q, source=harness_source(label),
+            )  # fmt: skip
 
 
 ANGLE_ULPS = 2
@@ -132,7 +136,7 @@ def _check_angle(got: float, exp: float) -> None:
 
 def _check_sdr(golden: dict, label: str) -> None:
     p1 = qdmem2_stress_matrices(_batch(SDR), CSTM)
-    w = {k: _Worst() for k in ("phase1", "stress", "force")}
+    w = {k: _Worst() for k in ("phase1", "stress", "force", "angle")}
     for i, case in enumerate(SDR):
         words = golden[case.name]["words"]
         mine = p1.words(i)
@@ -149,10 +153,16 @@ def _check_sdr(golden: dict, label: str) -> None:
             if block == "stress" and label != "live":
                 got = got.copy()
                 _check_angle(got[4], exp[4])
+                w["angle"].add(got[4:5], exp[4:5], check=False)
                 got[4] = exp[4]
             w[block].add(got[1:], exp[1:])
     for block, x in w.items():
-        record_parity(f"SQDM2{1 if block == 'phase1' else 2} {block} {label}", x.n, x.abs, x.rel)
+        if x.n == 0:
+            continue
+        record_parity(
+            f"SQDM2{1 if block == 'phase1' else 2} {block} {label}", x.n, x.abs, x.rel,
+            element="CQDMEM2", quantity="stress", source=harness_source(label),
+        )  # fmt: skip
 
 
 def _check_loads(golden: dict, label: str) -> None:
@@ -162,7 +172,10 @@ def _check_loads(golden: dict, label: str) -> None:
     for case, load in zip(LOADS, res, strict=True):
         exp = np.asarray(golden[case.name]["load"])
         w.add(load.add_to(np.zeros(exp.size)), exp)
-    record_parity(f"QDMM2 thermal load {label}", w.n, w.abs, w.rel)
+    record_parity(
+        f"QDMM2 thermal load {label}", w.n, w.abs, w.rel,
+        element="CQDMEM2", quantity="load", source=harness_source(label),
+    )  # fmt: skip
 
 
 def test_matrices_match_fortran_golden():

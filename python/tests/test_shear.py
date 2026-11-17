@@ -36,7 +36,7 @@ from nastran95py.elements.shear import (
 )
 from nastran95py.materials import Mat1, MaterialTable, Matt1, TableM1
 from nastran95py.reference.inventory import RF1_DECKS, repo_root
-from tests.conftest import record_parity
+from tests.conftest import harness_source, record_parity
 from tests.fortran_harness import cases as C
 from tests.fortran_harness import rod_cases as RC
 from tests.fortran_harness import runner as R
@@ -85,6 +85,7 @@ def _compare(dumps: dict, label: str) -> None:
     datas = [_data(c) for c in ok]
     batch = shear_matrices(ShearBatch.from_elements(datas, MATS), CSTM)
     worst = {"ref": [0.0, 0.0, 0], "batch": [0.0, 0.0, 0]}
+    per_file = {1: [0.0, 0.0, 0], 2: [0.0, 0.0, 0]}
     for i, (case, data) in enumerate(zip(ok, datas, strict=True)):
         out = sheard(data, MATS, CSTM)
         ref = dumps[case.name]["matrices"]
@@ -102,8 +103,16 @@ def _compare(dumps: dict, label: str) -> None:
             for key, (a, r) in (("ref", (ra, rr)), ("batch", (ba, br))):
                 w = worst[key]
                 w[0], w[1], w[2] = max(w[0], a), max(w[1], r), w[2] + vals.size
+                w = per_file[m["file"]]
+                w[0], w[1], w[2] = max(w[0], a), max(w[1], r), w[2] + vals.size
     for key, (a, r, n) in worst.items():
         record_parity(f"shear {key} vs {label}", n, a, r)
+    for file, (a, r, n) in per_file.items():
+        quantity = "K" if file == 1 else "M"
+        record_parity(
+            f"shear {quantity} vs {label}", n, a, r,
+            element="CSHEAR", quantity=quantity, source=harness_source(label),
+        )  # fmt: skip
 
     for case in bad:
         code, corner = _expected_error(dumps[case.name])

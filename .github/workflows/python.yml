@@ -47,6 +47,31 @@ jobs:
       - name: Pytest
         run: python -m pytest
 
+  # The RF1 parity gate: the whole suite against the Fortran listings and element
+  # harness, and PARITY.md must match what this run measures.
+  parity:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python
+    env:
+      NASTRAN95PY_REQUIRE_FORTRAN: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install gfortran
+        run: sudo apt-get update && sudo apt-get install -y gfortran && gfortran --version
+      - name: Install nastran95py
+        run: python -m pip install -e ".[dev]"
+      - name: Build Fortran harnesses
+        run: make -C tests/fortran_kernels && make -C tests/fortran_harness
+      - name: Pytest (parity suite, Fortran listings and element harness)
+        run: python -m pytest --parity-json=parity.json
+      - name: PARITY.md is current
+        run: python -m tests.parity_report --from parity.json --check
+
   # Oldest NumPy pyproject allows (1.x scalar promotion rules): the rod kernels'
   # REAL-emulating scalar and batched paths must stay bit-identical there too.
   test-numpy126:

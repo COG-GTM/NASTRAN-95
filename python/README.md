@@ -72,6 +72,47 @@ the expected `SingularStiffness` at (4, 3); d01161a compares only the as-input
 analysis (FSD occurrence 1); six d01013a CROD post axial forces are strict xfails,
 one SROD2 REAL rounding step off (see `D01013A_QUANTUM_ROWS`).
 
+### Parity report
+
+[`PARITY.md`](PARITY.md) is generated from a pytest run: per deck and listing
+quantity the value count and max absolute/relative error, per element type the
+max relative error against the Fortran element harness for K, M, thermal load and
+stress, and every relaxation of the comparison. `record_parity(...)` rows tagged
+`deck=`/`table=` or `element=`/`quantity=`/`source=` feed it.
+
+```bash
+python -m tests.parity_report                        # run pytest, rewrite PARITY.md
+python -m pytest --parity-json=parity.json           # or: keep the run's raw rows
+python -m tests.parity_report --from parity.json --check   # fail if stale (CI)
+```
+
+It refuses to write a report from a failing or partial run (a deck without listing
+rows, or no Fortran harness rows). `--check` compares the text and counts exactly
+and allows a 5% drift in the error values, which differ in the last bits between
+BLAS builds (and, in the element table, values below 2.5e-7, the last bit of libm
+`atan2f`). The `parity` CI job runs the whole suite and that check.
+
+### Adding a reference deck
+
+1. Put the deck in `../inp/<id>.inp` and its COSMIC listing in
+   `../demoout/<id>.out`, and add `<id>` with a one-line description to
+   `RF1_DECKS` in `nastran95py/reference/inventory.py`.
+2. `python -m nastran95py.reference.inventory` regenerates
+   `tests/reference/manifest.json` and `DECKS.md`; check the deck's consistency
+   checks there.
+3. `python -m nastran95py.reference.golden` writes
+   `tests/reference/golden/<id>.json` from the listing (`--report` prints its
+   tables). Listing sections the parser does not know are not compared; extend
+   `nastran95py/reference/golden.py` first if the deck prints new tables.
+4. Add `<id>` to `DECKS` in `tests/test_solve_static.py`; every golden table is
+   then compared at the golden tolerance. A deck with no solution tables goes in
+   `KGGX_ONLY`, one whose later occurrences the solver cannot reproduce (FSD) in
+   `FIRST_OCCURRENCE_ONLY`. Any other exception is a strict `xfail` with its cause,
+   listed under Relaxations in `tests/parity_report.py`. A new element type also
+   needs its harness parity rows and an entry in `ELEMENTS` there.
+5. Run `python -m pytest`, then `python -m tests.parity_report`, and commit the
+   golden file, manifest, `DECKS.md` and `PARITY.md` together.
+
 ## Setup
 
 ```bash

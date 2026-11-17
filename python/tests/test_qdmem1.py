@@ -43,7 +43,7 @@ from nastran95py.elements.trmem import material_angle
 from nastran95py.materials import Mat1, Mat2, MaterialTable, TableM1, TableM2, TableM3, TableM4
 from nastran95py.reference.golden import GoldenTable, compare, load_golden, tables
 from nastran95py.reference.inventory import RF1_DECKS, repo_root
-from tests.conftest import record_parity
+from tests.conftest import harness_source, record_parity
 from tests.fortran_harness import cases as C
 from tests.fortran_harness import qdmem1_cases as QC
 from tests.fortran_harness import rod_cases as RC
@@ -99,12 +99,13 @@ def _compare_emg(cases, dumps: dict, label: str) -> None:
     datas = [_data(c) for c in cases]
     batch = qdmem1_matrices(datas, MATS, CSTM)
     worst = {"ref": _Worst(), "batch": _Worst()}
+    per_q = {"K": _Worst(), "M": _Worst()}
     for i, (case, data) in enumerate(zip(cases, datas, strict=True)):
         out = qdmm1d(data, MATS, CSTM)
         assert tuple(out.sils) == tuple(sorted(data["sil"]))
         np.testing.assert_array_equal(batch.sils[i], out.sils)
-        for mine, full, ref in zip(
-            (out.stiffness, out.mass), (batch.k[i], batch.m[i]), dumps[case.name], strict=True
+        for q, mine, full, ref in zip(
+            "KM", (out.stiffness, out.mass), (batch.k[i], batch.m[i]), dumps[case.name], strict=True
         ):
             assert (mine.ndof, mine.icode, mine.dict2) == (ref["ndof"], ref["icode"], ref["dict2"])
             vals = np.asarray(ref["values"])
@@ -113,12 +114,18 @@ def _compare_emg(cases, dumps: dict, label: str) -> None:
             assert rr <= RTOL and br <= RTOL, (case.name, ref["file"], rr, br)
             worst["ref"].add(ra, rr, vals.size)
             worst["batch"].add(ba, br, vals.size)
+            per_q[q].add(max(ra, ba), max(rr, br), 2 * vals.size)
     for key, w in worst.items():
         record_parity(f"QDMM1D K/M {key} vs {label}", w.n, w.abs, w.rel)
+    for q, w in per_q.items():
+        record_parity(
+            f"QDMM1D {q} vs {label}", w.n, w.abs, w.rel,
+            element="CQDMEM1", quantity=q, source=harness_source(label),
+        )  # fmt: skip
 
 
 def _compare_sdr(cases, dumps: dict, label: str) -> None:
-    worst = {"phase1": _Worst(), "stress": _Worst()}
+    worst = {"phase1": _Worst(), "stress": _Worst(), "angle": _Worst()}
     for case in cases:
         data = _data(case)
         p1 = sqdm11(data, MATS, CSTM)
@@ -132,13 +139,18 @@ def _compare_sdr(cases, dumps: dict, label: str) -> None:
         assert R.real_word_as_int(want[0]) == data.eid
         # ANGLE comes from ATAN2 in REAL: libm atan2f may differ by an ulp across platforms.
         np.testing.assert_allclose(st.angle, want[4], rtol=2.5e-7, atol=1e-30)
+        a = abs(float(st.angle) - float(want[4]))
+        worst["angle"].add(a, a / abs(float(want[4])) if want[4] else a, 1)
         a, r = _err(np.delete(st.words(), 3), np.delete(want[1:], 3))
         assert r <= RTOL, (case.name, "stress", r)
         worst["stress"].add(a, r, 7)
         batch = qdmem1_stresses([data], MATS, case.extra[9:], CSTM, _temperature(case))
         np.testing.assert_array_equal(qdmem1_stress_table(batch)[0], st.row())
     for key, w in worst.items():
-        record_parity(f"SQDM11/12 {key} vs {label}", w.n, w.abs, w.rel)
+        record_parity(
+            f"SQDM11/12 {key} vs {label}", w.n, w.abs, w.rel,
+            element="CQDMEM1", quantity="stress", source=harness_source(label),
+        )  # fmt: skip
 
 
 def _compare_loads(cases, dumps: dict, label: str) -> None:
@@ -156,7 +168,10 @@ def _compare_loads(cases, dumps: dict, label: str) -> None:
             assert r <= RTOL, (case.name, key, r)
             worst[key].add(a, r, want.size)
     for key, w in worst.items():
-        record_parity(f"QDMM1 thermal load {key} vs {label}", w.n, w.abs, w.rel)
+        record_parity(
+            f"QDMM1 thermal load {key} vs {label}", w.n, w.abs, w.rel,
+            element="CQDMEM1", quantity="load", source=harness_source(label),
+        )  # fmt: skip
 
 
 # -- Fortran parity -----------------------------------------------------------------

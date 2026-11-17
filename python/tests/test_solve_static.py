@@ -153,8 +153,9 @@ def test_t01241a_stiffness_matches_kggx():
     assert rel <= 1e-6, rel
     nz = ref != 0.0
     record_parity(
-        "static t01241a K_gg vs KGGX", int(nz.sum()), err.max(), (err[nz] / abs(ref[nz])).max()
-    )
+        "static t01241a K_gg vs KGGX", int(nz.sum()), err.max(), (err[nz] / abs(ref[nz])).max(),
+        deck="t01241a", table="kggx",
+    )  # fmt: skip
 
 
 def test_t01241a_load_on_unstiff_dof_is_rejected():
@@ -175,7 +176,7 @@ def test_reference_deck_matches_golden(deck_id, key):
     assert not lines, "\n".join([f"{len(lines)} value(s) out of tolerance:", *lines])
     cmp = compare(_without_rows(table, skip) if skip else table, actual)
     assert cmp.n > 0 and cmp.failures == 0, cmp
-    record_parity(f"{deck_id} {key}", cmp.n, cmp.max_abs, cmp.max_rel)
+    record_parity(f"{deck_id} {key}", cmp.n, cmp.max_abs, cmp.max_rel, deck=deck_id, table=key)
 
 
 def test_every_reference_deck_is_covered():
@@ -247,7 +248,10 @@ def test_d01013a_post_axial_forces_are_one_real_quantum_off():
         assert actual[i, 1] == table.values[i, 1] == 0.0
     gold = table.values[rows, 0]
     dev = np.abs(actual[rows, 0] - gold)
-    record_parity("d01013a CROD posts (1-ulp u3)", len(dev), dev.max(), (dev / np.abs(gold)).max())
+    record_parity(
+        "d01013a CROD posts (1-ulp u3)", len(dev), dev.max(), (dev / np.abs(gold)).max(),
+        deck="d01013a", table="quantum-rows",
+    )  # fmt: skip
 
 
 # -- loads and constraints -----------------------------------------------------------
