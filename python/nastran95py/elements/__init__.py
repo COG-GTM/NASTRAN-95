@@ -9,6 +9,19 @@ from nastran95py.elements.contract import (
     FieldKind,
     GridPoint,
 )
+from nastran95py.elements.rod import (
+    EmgMatrix,
+    RodBatch,
+    RodBatchMatrices,
+    RodGeometryError,
+    RodMatrices,
+    RodProperties,
+    assemble,
+    real_cstm,
+    rod_matrices,
+    rod_properties,
+    rodd,
+)
 
 __all__ = [
     "CARD_LAYOUTS",
@@ -17,5 +30,16 @@ __all__ = [
     "ElementData",
     "Field",
     "FieldKind",
+    "EmgMatrix",
     "GridPoint",
+    "RodBatch",
+    "RodBatchMatrices",
+    "RodGeometryError",
+    "RodMatrices",
+    "RodProperties",
+    "assemble",
+    "real_cstm",
+    "rod_matrices",
+    "rod_properties",
+    "rodd",
 ]

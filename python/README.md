@@ -69,4 +69,6 @@ It links the unmodified RF1 element routines (EMG `rods/rodd`, `shears/sheard`,
 `ktriqd`; SDR2 `srod1/2`, `spanl1/2`, `strme1`, `sqdme1`, `sqdm11/12/21/22`,
 `stqme2`) and dumps K, M and stress/force words for the hand-built cases in
 `tests/fortran_harness/cases.py` (`tests/test_fortran_harness.py`);
-`python -m tests.fortran_harness.runner` regenerates `golden/harness_golden.json`.
+`python -m tests.fortran_harness.runner` regenerates `golden/harness_golden.json`
+(`python -m tests.fortran_harness.rod_cases` regenerates the coordinate-system
+RODD cases in `golden/rod_golden.json`, used by `tests/test_rod.py`).

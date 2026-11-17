@@ -119,7 +119,10 @@ class Cstm(Mapping[int, CoordSystem]):
 
 
 def transforms_to_basic(
-    cstm: Mapping[int, CoordSystem], cid: ArrayLike, points: ArrayLike
+    cstm: Mapping[int, CoordSystem],
+    cid: ArrayLike,
+    points: ArrayLike,
+    real_offset: bool = False,
 ) -> FloatArray:
     """Vectorised ``TRANSS``/``TRANSD``/``GBTRAN``: ``TA`` at each of ``points``.
 
@@ -130,6 +133,9 @@ def transforms_to_basic(
     CID 0 gives the identity. For cylindrical and spherical systems the local
     axes are evaluated at the point; on the polar axis (``r == 0``) the
     rectangular matrix is returned, as in the Fortran.
+
+    ``real_offset=True`` forms the point-minus-origin offset in REAL (float32)
+    arithmetic, as ``TRANSD`` does, for bit-level parity with the Fortran.
     """
     pts = np.atleast_2d(np.asarray(points, dtype=float))
     if pts.shape[-1] != 3 or pts.ndim != 2:
@@ -149,7 +155,11 @@ def transforms_to_basic(
         if cs.ctype == CoordType.RECTANGULAR:
             out[sel] = cs.t
             continue
-        x, y, z = ((pts[sel] - cs.origin) @ cs.t).T
+        if real_offset:
+            d = (pts[sel].astype(np.float32) - cs.origin.astype(np.float32)).astype(float)
+        else:
+            d = pts[sel] - cs.origin
+        x, y, z = (d @ cs.t).T
         r = np.hypot(x, y)
         polar = r == 0.0
         rs = np.where(polar, 1.0, r)
