@@ -445,6 +445,11 @@ def test_bulk_reader_reads_matt1_and_tablem():
             "+T8     0.      1.      100.    2.      ENDT",
             "TABLEM1 19                                                              +T9",
             "+T9     0.      1.      100.    2.      ENDT",
+            "TABLEM1 20                                                              +TA",
+            "+TA     0.              100.    2.      SKIP    10.     200.    3.      +TB",
+            "+TB     ENDT",
+            "TABLEM4 21      0.      1.      -10.    10.                             +TC",
+            "+TC     1.              .5      ENDT",
             "ENDDATA",
         ]
     )
@@ -454,6 +459,8 @@ def test_bulk_reader_reads_matt1_and_tablem():
     assert isinstance(t[11], TableM1) and isinstance(t[12], TableM2)
     assert isinstance(t[13], TableM3) and isinstance(t[14], TableM4)
     assert t[15].x == (0.0, 100.0)
+    assert (t[20].x, t[20].y) == ((0.0, 100.0, 200.0), (0.0, 2.0, 3.0))
+    assert t[21].a == (1.0, 0.0, 0.5)
     matt1 = mats._matt1[1]
     assert (matt1.e, matt1.g, matt1.nu, matt1.rho, matt1.alpha) == (11, 12, 13, 14, 15)
     assert (matt1.ge, matt1.st, matt1.sc, matt1.ss) == (16, 17, 18, 19)

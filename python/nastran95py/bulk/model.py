@@ -362,18 +362,35 @@ _TABLEM = {"TABLEM1": 0, "TABLEM2": 1, "TABLEM3": 2, "TABLEM4": 4}
 
 
 def _tablem(c: Card) -> TableM:
-    """TABLEM1-4: header parameters in fields 3-6, data from the first continuation to ENDT."""
+    """TABLEM1-4: header parameters in fields 3-6, data from the first continuation to ENDT.
+
+    As in IFS2P, a blank data field is 0.0 and a TABLEM1-3 point is dropped when
+    either of its two fields is SKIP.
+    """
     tid = int(_req(c, 1))
     params = [_real(c, i) for i in range(2, 2 + _TABLEM[c.name])]
-    data: list[float] = []
-    for v in c.fields[8:]:
-        if v == "ENDT":
-            break
-        if v == "SKIP" or v is None:
-            continue
+
+    def num(v) -> float:
+        if v is None:
+            return 0.0
         if not isinstance(v, int | float):
             raise BulkDataError(f"{c.name} {tid} (line {c.lineno}): bad table entry {v!r}")
-        data.append(float(v))
+        return float(v)
+
+    values = c.fields[8:]
+    data: list[float] = []
+    if c.name == "TABLEM4":
+        for v in values:
+            if v == "ENDT":
+                break
+            data.append(num(v))
+    else:
+        for k in range(0, len(values), 2):
+            pair = (values[k], values[k + 1] if k + 1 < len(values) else None)
+            if "ENDT" in pair:
+                break
+            if "SKIP" not in pair:
+                data += [num(v) for v in pair]
     if c.name == "TABLEM4":
         return TableM4(tid, *params, tuple(data))
     if len(data) % 2:
