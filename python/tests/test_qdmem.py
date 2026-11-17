@@ -417,6 +417,14 @@ def test_degenerate_quads_are_fatal():
             qdmem_load(d, MATS, 100.0)
 
 
+def test_collinear_subtriangle_is_a_quad_error():
+    """Grids 1-3 collinear: the quad axes exist, but sub-triangle II (2, 3, 1) is degenerate."""
+    d = _quad([(0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (4.0, 0.0, 0.0), (1.0, 2.0, 0.0)])
+    for call in (lambda: qdmem(d, MATS), lambda: sqdme1(d, MATS), lambda: qdmem_load(d, MATS, 1.0)):
+        with pytest.raises(QdmemGeometryError, match="31"):
+            call()
+
+
 def test_empty_batch():
     batch = QdmemBatch.from_elements([])
     for real_words in (True, False):

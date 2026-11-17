@@ -172,6 +172,16 @@ def _fail(eid, bad, what: str) -> None:
         raise QdmemGeometryError(f"quadrilaterals {np.asarray(eid)[bad].tolist()}: {what}")
 
 
+def _as_quad_error(call, *args):
+    """Run a CTRMEM kernel; its degenerate sub-triangles raise :class:`QdmemGeometryError`."""
+    try:
+        return call(*args)
+    except QdmemGeometryError:
+        raise
+    except TrmemGeometryError as exc:
+        raise QdmemGeometryError(f"sub-triangle: {exc}") from exc
+
+
 def _zero_small_sin(sinth: np.ndarray, dt) -> np.ndarray:
     """``IF (ABS(SINTH) .LT. 1.0E-06) SINTH = 0.0`` of ``KTRMEM``/``TRIMEM``/``STRME1``."""
     return np.where(np.abs(sinth) < dt(1.0e-6), dt(0.0), sinth).astype(dt)
@@ -527,7 +537,7 @@ def qdmem_thermal_loads(
         t=np.repeat(t_half, 4),
         nsm=np.repeat(batch.nsm, 4),
     )
-    loads = trmem_thermal_loads(sub, np.repeat(tb, 4), cstm, real_words)
+    loads = _as_quad_error(trmem_thermal_loads, sub, np.repeat(tb, 4), cstm, real_words)
     tri = np.array([ld.loads for ld in loads])
     tri = tri.reshape(n, 4, 3, 3).astype(dt)
     pg = np.zeros((n, 4, 3), dt)
@@ -620,7 +630,8 @@ def qdmem_stress_matrices(
     sinth, costh = mean_plane_angles(u, batch.theta, real_words)
     sinth = _zero_small_sin(sinth.astype(dt), dt).astype(float)
     g, alpha, tref, _rho, _ge = _materials(batch, sinth, costh, materials, real_words)
-    s = membrane_stress_matrices(
+    s = _as_quad_error(
+        membrane_stress_matrices,
         _round(batch.xyz, real_words)[:, SUBTRIANGLES].reshape(-1, 3, 3),
         batch.cid[:, SUBTRIANGLES].reshape(-1, 3),
         g.reshape(-1, 3, 3),
