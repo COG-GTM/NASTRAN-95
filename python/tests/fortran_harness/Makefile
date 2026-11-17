@@ -46,3 +46,18 @@ clean:
 	rm -rf $(BUILD)
 
 .PHONY: all clean
+
+# Rod thermal/deformation loads (mis/rod.f as called from EDTL): a separate
+# binary so the element driver stays untouched. BASGLB's CSTM read is renamed
+# to the CSTMRD stub in loadstubs.f.
+LOAD_OBJECTS := $(addprefix $(BUILD)/,rod.o basglb_cs.o mpyl.o premat.o sort.o gmmats.o \
+                khrfn1.o kstubs.o loadstubs.o rodload.o)
+
+all: $(BUILD)/rodload
+
+$(BUILD)/basglb_cs.o: $(MIS)/basglb.f | $(BUILD)
+	$(FC) $(FFLAGS) -c $< -o $@
+	objcopy --redefine-sym read_=cstmrd_ $@
+
+$(BUILD)/rodload: $(LOAD_OBJECTS)
+	$(FC) $(FFLAGS) $^ -o $@

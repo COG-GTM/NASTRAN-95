@@ -22,6 +22,14 @@ from nastran95py.elements.rod import (
     rod_properties,
     rodd,
 )
+from nastran95py.elements.rod_loads import (
+    RodLoad,
+    RodLoadBatch,
+    load_vector,
+    rod_load,
+    rod_loads,
+    tube_area,
+)
 
 __all__ = [
     "CARD_LAYOUTS",
@@ -35,11 +43,17 @@ __all__ = [
     "RodBatch",
     "RodBatchMatrices",
     "RodGeometryError",
+    "RodLoad",
+    "RodLoadBatch",
     "RodMatrices",
     "RodProperties",
     "assemble",
+    "load_vector",
     "real_cstm",
+    "rod_load",
+    "rod_loads",
     "rod_matrices",
     "rod_properties",
     "rodd",
+    "tube_area",
 ]
