@@ -40,6 +40,12 @@ from nastran95py.elements.shear import (
     shear_properties,
     sheard,
 )
+from nastran95py.elements.shear_loads import (
+    ShearLoad,
+    ShearLoadBatch,
+    shear_load,
+    shear_loads,
+)
 from nastran95py.elements.trmem import (
     TriangleGeometry,
     TrmemBatch,
@@ -78,6 +84,8 @@ __all__ = [
     "ShearBatch",
     "ShearBatchMatrices",
     "ShearGeometryError",
+    "ShearLoad",
+    "ShearLoadBatch",
     "ShearMatrices",
     "ShearProperties",
     "assemble",
@@ -89,6 +97,8 @@ __all__ = [
     "rod_properties",
     "rodd",
     "tube_area",
+    "shear_load",
+    "shear_loads",
     "shear_matrices",
     "shear_properties",
     "sheard",

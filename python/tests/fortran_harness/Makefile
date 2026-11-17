@@ -62,3 +62,13 @@ $(BUILD)/basglb_cs.o: $(MIS)/basglb.f | $(BUILD)
 
 $(BUILD)/rodload: $(LOAD_OBJECTS)
 	$(FC) $(FFLAGS) $^ -o $@
+
+# Shear panel thermal loads (mis/tshear.f as called from EDTL): its own binary,
+# reusing the BASGLB/CSTMRD and SSGETD stubs of the rod load harness.
+TSHEAR_OBJECTS := $(addprefix $(BUILD)/,tshear.o basglb_cs.o mpyl.o saxb.o premat.o sort.o \
+                  gmmats.o khrfn1.o kstubs.o loadstubs.o tshearld.o)
+
+all: $(BUILD)/tshearld
+
+$(BUILD)/tshearld: $(TSHEAR_OBJECTS)
+	$(FC) $(FFLAGS) $^ -o $@

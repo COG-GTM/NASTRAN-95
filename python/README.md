@@ -81,6 +81,12 @@ RODD cases in `golden/rod_golden.json`, used by `tests/test_rod.py`;
 SSGETD/FEDT/CSTM stubs in `loadstubs.f`; `python -m tests.fortran_harness.rod_load_cases`
 regenerates `golden/rod_load_golden.json`, used by `tests/test_rod_loads.py`.
 
+`build/tshearld` links `mis/tshear.f`, the EDTL thermal load routine for CSHEAR
+(pseudo-rods on the four panel edges), against the same `basglb`/`mpyl` and
+`loadstubs.f` stubs (SSGETD also returns the grid temperatures `TI(2..5)`);
+`python -m tests.fortran_harness.shear_load_cases` regenerates
+`golden/shear_load_golden.json`, used by `tests/test_shear_loads.py`.
+
 `python -m tests.fortran_harness.shear_cases` regenerates the SHEARD cases
 (every flexibility branch, warped/skewed/CSTM panels, and the MESAGE 2026/2027
 exits) in `golden/shear_golden.json`, used by `tests/test_shear.py`.

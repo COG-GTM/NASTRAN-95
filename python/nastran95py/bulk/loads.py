@@ -34,3 +34,17 @@ def load_temperatures(
     temperature word is built.
     """
     return {r.data.eid: element_temperature(model, r.connection.grids, set_id) for r in records}
+
+
+def load_grid_temperatures(
+    model: BulkModel, records: Iterable[EcptRecord], set_id: int
+) -> dict[int, tuple[float, ...]]:
+    """Connected-grid TEMP/TEMPD values of each record in load temperature set ``set_id``.
+
+    What ``SSGETD (ELID, TI, GRIDS)`` returns in ``TI(2..GRIDS+1)`` for elements such
+    as CSHEAR (``TSHEAR``) that load from the individual grid temperatures.
+    """
+    return {
+        r.data.eid: tuple(model.grid_temperature(set_id, g) for g in r.connection.grids)
+        for r in records
+    }
