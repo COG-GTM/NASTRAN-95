@@ -17,6 +17,8 @@ import sys
 
 import numpy as np
 
+from nastran95py.coords import CoordSystem
+
 from . import cases as C
 from . import runner as R
 
@@ -47,6 +49,15 @@ CSTM = [
     _cs(30, 3, (-2.0, 1.0, 0.5), _rot(10.0, 60.0, -20.0)),
 ]
 
+# Systems defined by three points (as CORD2R/C/S) and kept in float64: the Python
+# side uses them unrounded, the harness gets their REAL words.
+FROM_POINTS = {
+    40: CoordSystem.from_points(40, 1, (0.3, -1.1, 2.7), (1.9, 0.4, 5.3), (4.1, -2.2, 1.7)),
+    41: CoordSystem.from_points(41, 2, (-0.7, 0.9, 1.3), (0.6, 2.1, 4.9), (3.3, -1.4, 0.2)),
+    42: CoordSystem.from_points(42, 3, (1.1, 0.7, -0.9), (-1.3, 3.1, 2.3), (2.9, 4.7, -3.1)),
+}
+CSTM += [_cs(cid, int(cs.ctype), cs.origin, cs.t) for cid, cs in FROM_POINTS.items()]
+
 # tag: ((cidA, xyzA), (cidB, xyzB)), mid, A, J, C, NSM, (SIL1, SIL2)
 ROD_CSTM_GEOMS = {
     "rect": (((10, (0.0, 0.0, 0.0)), (10, (4.0, 3.0, -2.0))), 1, 2.0, 0.5, 0.1, 0.01, (1, 7)),
@@ -57,6 +68,10 @@ ROD_CSTM_GEOMS = {
     "mixed-rev": (((10, (1.0, 1.0, 1.0)), (30, (6.0, -1.0, 4.0))), 2, 0.5, 0.1, 0.0, 0.02, (7, 1)),
     "skew-rev": (((0, (1.0, 2.0, 3.0)), (20, (4.0, -2.0, 8.0))), 2, 0.75, 0.2, 0.05, 0.0, (13, 7)),
     "torsion": (((10, (0.0, 0.0, 0.0)), (20, (4.0, 3.0, -2.0))), 1, 0.0, 0.3, 0.0, 0.004, (1, 7)),
+    "fp-rect": (((40, (0.1, 0.2, 0.3)), (40, (4.3, -2.9, 6.1))), 1, 2.0, 0.5, 0.0, 0.01, (1, 7)),
+    "fp-cyl": (((41, (1.7, 2.3, 3.1)), (41, (-4.1, 0.9, 7.3))), 2, 0.75, 0.2, 0.0, 0.003, (1, 7)),
+    "fp-sph": (((42, (2.3, 1.9, -1.3)), (42, (-3.7, 4.1, 6.9))), 1, 1.25, 0.4, 0.0, 0.0, (7, 1)),
+    "fp-mixed": (((40, (1.3, 1.1, 0.7)), (42, (6.1, -1.7, 4.3))), 2, 0.5, 0.1, 0.0, 0.02, (1, 7)),
     "axial": (((0, (0.0, 0.0, 0.0)), (10, (0.0, 0.0, 25.0))), 1, 1.5, 0.0, 0.0, 0.002, (7, 1)),
 }
 

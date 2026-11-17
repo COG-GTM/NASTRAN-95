@@ -24,8 +24,8 @@ Rows and columns follow ascending SIL, as in the Fortran. Two paths are given:
 
 With ``real_words=True`` (default) inputs are rounded to the 32-bit REAL words
 the Fortran stores and the products ``RODD`` forms in REAL arithmetic
-(``E*A``, ``G*J``, ``RHO*A+NSM``, grid coordinate differences and the
-``TRANSD`` offset) are rounded to float32, which reproduces the Fortran to
+(``E*A``, ``G*J``, ``RHO*A+NSM``, grid coordinate differences, the CSTM
+origins/rotations and the ``TRANSD`` offset) are rounded to float32, which reproduces the Fortran to
 float64 round-off. ``real_words=False`` evaluates everything in float64.
 
 The heat-transfer branch of ``RODD`` (conductivity/capacity) is not ported.
@@ -139,6 +139,19 @@ def _check_rod(eid, sils, length) -> None:
         raise RodGeometryError(f"rod element {eid} has illegal geometry or connections (3118)")
 
 
+def real_cstm(cstm: Mapping[int, CoordSystem]) -> dict[int, CoordSystem]:
+    """CSTM with origins and rotations rounded to the REAL words ``TRANSD`` reads."""
+    return {
+        cid: CoordSystem(
+            cs.cid,
+            cs.ctype,
+            cs.origin.astype(np.float32).astype(float),
+            cs.t.astype(np.float32).astype(float),
+        )
+        for cid, cs in cstm.items()
+    }
+
+
 def _transd(cstm, cid: int, xyz, real_words: bool) -> FloatArray:
     """``TRANSD``: 3x3 global-to-basic matrix (row-major ``TA(9)`` as a 3x3 array)."""
     if cid == 0:
@@ -161,6 +174,8 @@ def rodd(
     """
     props = materials if isinstance(materials, RodProperties) else rod_properties(data, materials)
     cstm = {} if cstm is None else cstm
+    if real_words:
+        cstm = real_cstm(cstm)
     eid = data.eid
     sil1, sil2 = (int(s) for s in data["sil"])  # type: ignore[union-attr]
     grid_a, grid_b = data.grids
@@ -320,6 +335,8 @@ def rod_matrices(
 ) -> RodBatchMatrices:
     """Vectorised ``RODD``: 12x12 stiffness and mass of every rod in ``batch``."""
     cstm = {} if cstm is None else cstm
+    if real_words:
+        cstm = real_cstm(cstm)
     n = len(batch)
     dt = np.float32 if real_words else np.float64
     xyz = batch.xyz.astype(dt)

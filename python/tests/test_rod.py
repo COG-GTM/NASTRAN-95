@@ -39,6 +39,8 @@ from tests.fortran_harness import runner as R
 RTOL = 1e-12
 MATS = MaterialTable([Mat1(mid, *vals) for mid, vals in C.MAT1])
 CSTM = {cid: CoordSystem(cid, t, w[:3], np.reshape(w[3:], (3, 3))) for cid, t, w in RC.CSTM}
+# CORD2-style systems stay unrounded float64; real_words=True rounds them as TRANSD reads REAL.
+CSTM.update(RC.FROM_POINTS)
 
 
 def _orthonormal(t: np.ndarray) -> np.ndarray:
@@ -112,7 +114,7 @@ def _golden_dumps() -> dict:
 def test_rodd_matches_fortran_golden():
     names = {c.name for c in CASES}
     assert {c.name for c in RC.ROD_CSTM_CASES} <= set(json.loads(RC.GOLDEN.read_text()))
-    assert len(names) == len(CASES) == 12 + 36
+    assert len(names) == len(CASES) == 12 + 52
     _compare(CASES, _golden_dumps(), "Fortran RODD golden")
 
 
