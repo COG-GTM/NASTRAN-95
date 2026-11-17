@@ -89,7 +89,8 @@ python -m tests.parity_report --from parity.json --check   # fail if stale (CI)
 It refuses to write a report from a failing or partial run (a deck without listing
 rows, or no Fortran harness rows). `--check` compares the text and counts exactly
 and allows a 5% drift in the error values, which differ in the last bits between
-BLAS builds. The `parity` CI job runs the whole suite and that check.
+BLAS builds (and, in the element table, values below 2.5e-7, the last bit of libm
+`atan2f`). The `parity` CI job runs the whole suite and that check.
 
 ### Adding a reference deck
 

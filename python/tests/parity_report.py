@@ -11,8 +11,8 @@ that file into PARITY.md.
     python -m tests.parity_report --from parity.json --check   # fail if stale (CI)
 
 ``--check`` compares text and integers exactly; errors are equal when both are below
-``NOISE_FLOOR`` or within ``ERROR_RTOL`` of each other, since the last bits of the
-BLAS/LAPACK results differ between machines.
+``NOISE_FLOOR`` (``HARNESS_FLOOR`` in the element table) or within ``ERROR_RTOL`` of
+each other, since the last bits of BLAS/LAPACK and libm results differ between machines.
 """
 
 from __future__ import annotations
@@ -46,6 +46,10 @@ KIND_LABELS = {
     "stress": "stress",
 }
 NOISE_FLOOR = 1e-12
+# Harness errors are relative; below about 2 float32 ulps they are the last bit of
+# libm REAL functions (atan2f for principal angles), which differs between platforms.
+HARNESS_FLOOR = 2.5e-7
+HARNESS_SECTION = "## Element harness parity"
 ERROR_RTOL = 0.05
 _ERR = re.compile(r"\d\.\d{2}e[+-]\d{2}")
 
@@ -160,13 +164,15 @@ def render(data: dict) -> str:
             lines.append(f"| {deck} | {label} | {subcases} | {n} | {_e(a)} | {_e(rel)} |")
     lines += [
         "",
-        "## Element harness parity",
+        HARNESS_SECTION,
         "",
         "Max relative error (max |error| / max |Fortran| per case, worst case) of the Python",
         "kernels, reference and batched paths, against the Fortran element harness dumps",
         "checked in under `tests/fortran_harness/golden/`. Stress covers the phase-1 SDR2",
         "matrices and the phase-2 stress, force and principal-angle words. Each CI job also",
         "rebuilds the harness with its own gfortran and repeats these comparisons live.",
+        f"Values below {HARNESS_FLOOR:.1e} are the last bit of libm `atan2f` (principal",
+        "angles) and vary between platforms.",
         "",
         "| Element | " + " | ".join(q for _, q in QUANTITIES) + " |",
         "|---|" + "---:|" * len(QUANTITIES),
@@ -212,8 +218,15 @@ def render(data: dict) -> str:
     return "\n".join(lines)
 
 
-def _split(text: str) -> tuple[str, list[float]]:
-    return _ERR.sub("#", text), [float(x) for x in _ERR.findall(text)]
+def _split(text: str) -> tuple[str, list[tuple[float, float]]]:
+    """Text with the error values masked, and each value with its noise floor."""
+    out = []
+    for i, part in enumerate(text.split(HARNESS_SECTION)):
+        floor = HARNESS_FLOOR if i == 1 else NOISE_FLOOR
+        part = part.split("\n## Relaxations")
+        out += [(float(x), floor) for x in _ERR.findall(part[0])]
+        out += [(float(x), NOISE_FLOOR) for p in part[1:] for x in _ERR.findall(p)]
+    return _ERR.sub("#", text), out
 
 
 def stale(current: str, committed: str) -> list[str]:
@@ -224,8 +237,8 @@ def stale(current: str, committed: str) -> list[str]:
             committed.splitlines(), current.splitlines(), "committed", "current", lineterm=""
         ))  # fmt: skip
     out = []
-    for i, (a, b) in enumerate(zip(cur_v, old_v, strict=True)):
-        if max(a, b) <= NOISE_FLOOR or math.isclose(a, b, rel_tol=ERROR_RTOL):
+    for i, ((a, floor), (b, _)) in enumerate(zip(cur_v, old_v, strict=True)):
+        if max(a, b) <= floor or math.isclose(a, b, rel_tol=ERROR_RTOL):
             continue
         out.append(f"error #{i + 1}: committed {b:.2e}, current {a:.2e}")
     return out

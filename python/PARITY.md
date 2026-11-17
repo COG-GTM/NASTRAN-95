@@ -64,6 +64,8 @@ kernels, reference and batched paths, against the Fortran element harness dumps
 checked in under `tests/fortran_harness/golden/`. Stress covers the phase-1 SDR2
 matrices and the phase-2 stress, force and principal-angle words. Each CI job also
 rebuilds the harness with its own gfortran and repeats these comparisons live.
+Values below 2.5e-07 are the last bit of libm `atan2f` (principal
+angles) and vary between platforms.
 
 | Element | K | M | thermal load | stress |
 |---|---:|---:|---:|---:|

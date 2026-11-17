@@ -61,6 +61,15 @@ def test_stale_ignores_last_bit_noise_only():
     assert P.stale("| d | y | 1 | 10 | 1.00e-04 | 3.00e-16 |", old)
 
 
+def test_stale_ignores_float32_ulp_noise_in_harness_table_only():
+    harness = P.HARNESS_SECTION + "\n| CQDMEM2 | 6.42e-16 | {} |\n## Relaxations\n"
+    listing = "| d | x | 1 | 10 | 1.00e-04 | {} |\n"
+    old = listing.format("0.00e+00") + harness.format("0.00e+00")
+    assert P.stale(listing.format("0.00e+00") + harness.format("8.22e-08"), old) == []
+    assert P.stale(listing.format("0.00e+00") + harness.format("4.00e-07"), old)
+    assert P.stale(listing.format("8.22e-08") + harness.format("0.00e+00"), old)
+
+
 def test_committed_report_lists_every_deck_and_relaxation():
     text = P.PARITY_MD.read_text()
     for deck in RF1_DECKS:

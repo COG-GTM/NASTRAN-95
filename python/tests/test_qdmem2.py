@@ -96,8 +96,9 @@ class _Worst:
     def __init__(self):
         self.abs, self.rel, self.n = 0.0, 0.0, 0
 
-    def add(self, got, exp):
-        np.testing.assert_allclose(got, exp, rtol=RTOL, atol=0.0)
+    def add(self, got, exp, check=True):
+        if check:
+            np.testing.assert_allclose(got, exp, rtol=RTOL, atol=0.0)
         a, r = _err(got, exp)
         self.abs, self.rel, self.n = max(self.abs, a), max(self.rel, r), self.n + np.size(exp)
 
@@ -152,7 +153,7 @@ def _check_sdr(golden: dict, label: str) -> None:
             if block == "stress" and label != "live":
                 got = got.copy()
                 _check_angle(got[4], exp[4])
-                w["angle"].add(got[4:5], exp[4:5])
+                w["angle"].add(got[4:5], exp[4:5], check=False)
                 got[4] = exp[4]
             w[block].add(got[1:], exp[1:])
     for block, x in w.items():
