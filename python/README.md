@@ -118,3 +118,13 @@ d01013a, d01014a, d01161a).
 `SPANL1`/`SPANL2` cases (the same panels with general displacements, a material
 with a shear allowable for the margin of safety) in
 `golden/shear_stress_golden.json`, used by `tests/test_shear_stress.py`.
+
+`python -m tests.fortran_harness.qdmem_cases` reruns the plain CQDMEM cases
+(warped/skewed quadrilaterals, coordinate systems, material angles, NSM, load
+temperature, zero stress) and regenerates `golden/qdmem_golden.json`: `kqdmem`
+stiffness and `sqdme1`/`stqme2` stresses on `build/harness`, plus the
+`qdmem` thermal load (four `trimem (1)` calls) and the `masstq (1)` lumped
+mass on `build/qdmemx` (`qdmemx.f`, with the `basglb`/`loadstubs.f` CSTM stub).
+`tests/test_qdmem.py` checks `nastran95py.elements.qdmem` against them, the
+CQDMEM cases of `harness_golden.json`, and the "STRESSES IN QUADRILATERAL
+MEMBRANES" tables of the listings (d01011a, d01161a).
