@@ -8,7 +8,7 @@ built from it by :mod:`nastran95py.bulk.ecpt`.
 
 Supported cards: GRID, GRDSET, SPOINT, SEQGP, CORD1R/C/S, CORD2R/C/S, CROD,
 CONROD, PROD, CSHEAR, PSHEAR, CTRMEM, PTRMEM, CQDMEM, CQDMEM1, CQDMEM2, PQDMEM,
-PQDMEM1, PQDMEM2, MAT1, MAT2, FORCE, MOMENT, SPC, SPC1, TEMP and TEMPD. Other
+PQDMEM1, PQDMEM2, MAT1, MAT2, MATT1, TABLEM1-4, FORCE, MOMENT, SPC, SPC1, TEMP and TEMPD. Other
 cards are kept in ``BulkModel.ignored`` (counted, not interpreted).
 """
 
@@ -21,7 +21,17 @@ import numpy as np
 from numpy.typing import NDArray
 
 from nastran95py.coords import CoordSystem, CoordType, Cstm
-from nastran95py.materials import Mat1, Mat2, MaterialTable
+from nastran95py.materials import (
+    Mat1,
+    Mat2,
+    MaterialTable,
+    Matt1,
+    TableM,
+    TableM1,
+    TableM2,
+    TableM3,
+    TableM4,
+)
 from nastran95py.reference.cards import Card, Deck, expand_ids, read_deck
 
 FloatArray = NDArray[np.float64]
@@ -145,6 +155,8 @@ class BulkModel:
         cords: list[Card] = []
         mat1: list[Mat1] = []
         mat2: list[Mat2] = []
+        matt1: list[Matt1] = []
+        tablem: list[TableM] = []
         for c in cards:
             handler = _HANDLERS.get(c.name)
             if c.name.startswith("CORD") and c.name[-1] in _CORD_TYPES:
@@ -155,11 +167,15 @@ class BulkModel:
                 mat1.append(_mat1(c))
             elif c.name == "MAT2":
                 mat2.append(_mat2(c))
+            elif c.name == "MATT1":
+                matt1.append(_matt1(c))
+            elif c.name in _TABLEM:
+                tablem.append(_tablem(c))
             elif handler is not None:
                 handler(model, c)
             elif c.name != "GRDSET":
                 model.ignored[c.name] += 1
-        model.materials = MaterialTable(mat1, mat2)
+        model.materials = MaterialTable(mat1, mat2, matt1, tablem)
         model._resolve_geometry(cords)
         return model
 
@@ -324,6 +340,38 @@ def _mat1(c: Card) -> Mat1:
 
 def _mat2(c: Card) -> Mat2:
     return Mat2(int(_req(c, 1)), *(_real(c, i) for i in range(2, 17)))
+
+
+def _matt1(c: Card) -> Matt1:
+    """MATT1: table ids in MAT1 field positions (field 8, the TREF slot, is not used)."""
+    ids = [int(c.get(i, 0)) for i in (2, 3, 4, 5, 6, 8, 9, 10, 11)]
+    return Matt1(int(_req(c, 1)), *ids)
+
+
+_TABLEM = {"TABLEM1": 0, "TABLEM2": 1, "TABLEM3": 2, "TABLEM4": 4}
+
+
+def _tablem(c: Card) -> TableM:
+    """TABLEM1-4: header parameters in fields 3-6, data from the first continuation to ENDT."""
+    tid = int(_req(c, 1))
+    params = [_real(c, i) for i in range(2, 2 + _TABLEM[c.name])]
+    data: list[float] = []
+    for v in c.fields[8:]:
+        if v == "ENDT":
+            break
+        if v == "SKIP" or v is None:
+            continue
+        if not isinstance(v, int | float):
+            raise BulkDataError(f"{c.name} {tid} (line {c.lineno}): bad table entry {v!r}")
+        data.append(float(v))
+    if c.name == "TABLEM4":
+        return TableM4(tid, *params, tuple(data))
+    if len(data) % 2:
+        raise BulkDataError(f"{c.name} {tid} (line {c.lineno}): odd number of table entries")
+    xy = (tuple(data[0::2]), tuple(data[1::2]))
+    if c.name == "TABLEM1":
+        return TableM1(tid, *xy)
+    return (TableM2 if c.name == "TABLEM2" else TableM3)(tid, *params, *xy)
 
 
 def _crod(model: BulkModel, c: Card) -> None:

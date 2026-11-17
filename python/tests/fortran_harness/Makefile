@@ -62,3 +62,13 @@ $(BUILD)/basglb_cs.o: $(MIS)/basglb.f | $(BUILD)
 
 $(BUILD)/rodload: $(LOAD_OBJECTS)
 	$(FC) $(FFLAGS) $^ -o $@
+
+# CQDMEM1 thermal load (mis/qdmm1.f as called from EDTL): a separate binary;
+# BASGLB is fed through its /TRANX/ cache (single non-basic system per element).
+QDLOAD_OBJECTS := $(addprefix $(BUILD)/,qdmm1.o basglb.o premat.o gmmats.o mpyl.o sort.o \
+                  khrfn1.o kstubs.o stubs.o qdmm1load.o)
+
+all: $(BUILD)/qdmm1load
+
+$(BUILD)/qdmm1load: $(QDLOAD_OBJECTS)
+	$(FC) $(FFLAGS) $^ -o $@
