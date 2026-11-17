@@ -64,8 +64,13 @@ stiffness and no load are constrained (GPSP); a loaded one or a mechanism raises
 `SingularStiffness`. MPC, OMIT/ASET, SUPORT, SPCD, DEFORM, subcase combinations
 and any card the bulk reader does not interpret raise `NotSupported`; PARAM,
 CNGRNT and POPT/PLIMIT are ignored (the fully stressed design loop is not run).
-`tests/test_solve_static.py` checks t01241a's assembled `K_gg` against KGGX and
-the d01011a, d01161a and d01032a listings.
+`tests/test_solve_static.py` solves every RF1 reference deck and compares each
+golden table (displacements, SPC forces, OLOAD, element forces and stresses) at
+the golden-file tolerance; a mismatch names deck, subcase, grid/element id and
+component. t01241a (no solution in its listing) checks `K_gg` against KGGX and
+the expected `SingularStiffness` at (4, 3); d01161a compares only the as-input
+analysis (FSD occurrence 1); six d01013a CROD post axial forces are strict xfails,
+one SROD2 REAL rounding step off (see `D01013A_QUANTUM_ROWS`).
 
 ## Setup
 
