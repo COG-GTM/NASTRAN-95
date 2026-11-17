@@ -133,7 +133,7 @@ def parse(text: str, cases: list[C.Case]) -> list[CaseResult]:
             flush()
             current = CaseResult(cases[int(head[1]) - 1])
             results.append(current)
-        elif tag in {"MATRIX", "PART", "PHASE1", "STRESS", "FORCE"}:
+        elif tag in {"MATRIX", "PART", "PHASE1", "STRESS", "FORCE", "LOAD"}:
             flush()
             pending = (tag, [int(x) for x in head[1:]])
         elif tag == "END":
