@@ -1,0 +1,79 @@
+// NASTRAN-95 architecture (master). Edit this file, then run ./render.sh.
+digraph nastran95 {
+  graph [rankdir=TB, fontname="DejaVu Sans", fontsize=20, labelloc=t, nodesep=0.35, ranksep=0.45,
+         label="NASTRAN-95 on master: COSMIC Fortran program (left) and nastran95py RF1 port (right)", pad=0.3];
+  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=15, fillcolor=white, color="#555555"];
+  edge  [fontname="DejaVu Sans", fontsize=13, color="#444444"];
+
+  subgraph cluster_inputs {
+    label="Shared inputs (checked in)"; style="rounded,filled"; fillcolor="#f3f3f3"; color="#999999";
+    inp     [label="inp/*.inp\n132 demo decks (+ .txt notes)\n(Executive, Case Control, Bulk Data)", fillcolor="#fff6d5"];
+    demoout [label="demoout/*.out\n132 COSMIC listings\n(reference results)", fillcolor="#fff6d5"];
+    { rank=same; inp; demoout; }
+  }
+
+  subgraph cluster_fortran {
+    label="COSMIC NASTRAN executable (Fortran 77, 1995 UNIX release)"; style="rounded,filled"; fillcolor="#e8f0fb"; color="#4a74b5";
+    script  [label="bin/nastran (csh)\nruns chkfil.exe, writes <problem>.cmd:\nLOGNM / DICTNM / FTNnn / RFDIR / DBMEM env,\nnastrn.exe < .inp > .out"];
+    exe     [label="bin/nastrn.exe + nastlib.a\n32-bit SPARC Solaris build\n(PROGRAM NASTRN, bin/nastrn.f; linked by bin/linknas)"];
+    preface [label="Preface  mis/semint.f\nNASCAR, XCSA (Executive Control),\nIFP1 (Case Control), XSORT2 + IFP/IFP3 (Bulk Data),\nXGPI (compile DMAP to OSCAR)"];
+    rf      [label="rf/  Rigid Formats\nDISP0-19, HEAT1/3/9, AERO9-11\n(DMAP solution sequences)", fillcolor="#dbe8f7"];
+    alt     [label="alt/  COSMIC DMAP ALTERs\nCOSHYD1/2, COSDDAM, COSDFVA,\nCOSMFVA, COSDBCL", fillcolor="#dbe8f7"];
+    exec    [label="Executive  mis/xsem00.f\nruns DMAP modules from the OSCAR\n(GP1-4, EMG/SMA1, SSG1-3, SDR1-2, OFP, ...)"];
+    mis     [label="mis/  1,676 module + element routines (*.f, *.COM)"];
+    bd      [label="bd/  40 BLOCK DATA tables"];
+    mds     [label="mds/  machine-dependent layer\nGINO / DBM file I/O, packing, timers"];
+    out     [label="listing (.out, stdout), .log, .dic,\nplot file (.plt), punch", fillcolor="#fff6d5"];
+    script -> exe -> preface;
+    rf -> preface [label="RFDIR"];
+    alt -> preface [label="ALTER in\nExecutive Control", style=dashed];
+    preface -> exec [label="OSCAR"];
+    exec -> mis [arrowhead=none];
+    mis -> bd [arrowhead=none];
+    mis -> mds [arrowhead=none];
+    exec -> out;
+  }
+
+  subgraph cluster_tools {
+    label="Stand-alone tools"; style="rounded,filled"; fillcolor="#f3f3f3"; color="#999999";
+    um   [label="um/  User's Manual text\n+ nasthelp.f viewer"];
+    util [label="utility/  ff.f (free-field to\nfixed-field), nastplot.f (plot file)"];
+  }
+  out -> util [label="plot file", style=dashed, constraint=false];
+  mds -> um [style=invis];
+  bd -> util [style=invis];
+
+  subgraph cluster_python {
+    label="python/nastran95py  (Python 3.11+, NumPy, SciPy; RF1 static only)"; style="rounded,filled"; fillcolor="#e7f5e9"; color="#3d8b4a";
+    reference [label="reference\ncards/casecontrol deck reader,\ninventory, listing + golden parsers"];
+    bulk      [label="bulk\nBulkModel, SILs,\nECPT records, TEMP/TEMPD"];
+    matco     [label="materials + coords + io\nMAT1/MAT2/MATT1, TABLEM1-4,\nCSTM / BASGLB, REAL word helpers"];
+    elements  [label="elements\nCROD/CONROD, CSHEAR, CTRMEM,\nCQDMEM, CQDMEM1, CQDMEM2:\nK, M, thermal load, stress recovery"];
+    solve     [label="solve.static  solve_static()\nK_gg assembly, PS/SPC/SPC1, loads,\nspsolve per subcase, SPC force + element recovery"];
+    { rank=same; bulk; matco; }
+    reference -> bulk [label="Deck / Card"];
+    bulk -> elements [label="ECPT"];
+    matco -> elements;
+    elements -> solve;
+    bulk -> solve;
+  }
+
+  subgraph cluster_tests {
+    label="python/tests  (CI: .github/workflows/python.yml)"; style="rounded,filled"; fillcolor="#fbeee6"; color="#c0763c";
+    golden  [label="tests/reference\nmanifest.json, DECKS.md,\ngolden/*.json (9 RF1 decks)"];
+    harness [label="fortran_kernels + fortran_harness\ngfortran builds unmodified mis/*.f\nwith GINO stubs -> golden JSON"];
+    pytest  [label="pytest + ruff\nparity vs Fortran and vs listings"];
+    { rank=same; golden; harness; }
+    golden -> pytest;
+    harness -> pytest;
+  }
+
+  inp -> script [label="<problem>.inp"];
+  inp -> reference [label="RF1 decks"];
+  demoout -> reference [label="parse"];
+  reference -> golden [label="generate", constraint=false];
+  solve -> golden [style=invis];
+  mis -> harness [label="compile element\nroutines", style=dashed, constraint=false];
+  solve -> pytest [label="results"];
+  elements -> pytest;
+}
