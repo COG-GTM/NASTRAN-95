@@ -37,12 +37,16 @@ The diagram source is [`diagrams/architecture.dot`](diagrams/architecture.dot)
 
 ### Running a deck
 
-`bin/nastran <problem>` reads `<problem>.inp`. It sets the logical file names
-the executive reads from the environment (`FT05` input, `FT06` listing, `FT03`
-log, `FT04` dictionary, plot and punch files, `RFDIR` for the Rigid Formats,
-`DBMEM`/`OCMEM` for in-memory database and open core sizes), runs
-`chkfil.exe` on the deck to decide which optional files to open, and then
-runs `nastrn.exe < <problem>.inp > <problem>.out`.
+`bin/nastran <problem>` is an interactive csh script. It names the files
+after the problem (`<problem>.inp` input, `.out` listing, `.log`, `.dic`,
+`.plt`, `.pch`), runs `chkfil.exe` on the deck, asks about scratch and
+memory settings, and writes `<problem>.cmd`. That script passes the file
+names to the executive as environment variables (`LOGNM`, `DICTNM`,
+`PLTNM`, `PUNCHNM`, `NPTPNM`, `OPTPNM`, `FTN11`-`FTN23`, `SOF1`/`SOF2`,
+`DIRCTY` for scratch, `RFDIR` for the Rigid Formats, `DBMEM`/`OCMEM` for the
+in-memory database and open core sizes) and runs
+`nastrn.exe < <problem>.inp > <problem>.out`. `bin/nastran` then offers to
+run the script in the foreground or background.
 
 ### Inside `nastrn.exe`
 
@@ -65,7 +69,7 @@ runs `nastrn.exe < <problem>.inp > <problem>.out`.
 4. All intermediate data blocks and matrices go through GINO in `mds/`, backed
    by scratch files or the in-memory DBM database.
 
-The result is the FT06 listing (what `demoout/*.out` holds), plus the log,
+The result is the printed listing on stdout, `<problem>.out` (what `demoout/*.out` holds), plus the log,
 dictionary, plot file (`utility/nastplot.f` reads it) and punch output.
 
 ### Building

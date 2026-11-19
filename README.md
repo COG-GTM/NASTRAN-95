@@ -33,7 +33,7 @@ How the parts fit together is described in [docs/architecture.md](docs/architect
 
 ## Running the Fortran program
 
-`bin/nastran <problem>` runs `<problem>.inp` and writes `<problem>.out`, `.log`, `.dic`, `.plt` and `.pch`. Before use, edit the `rfdir`, `nasexec` and `naschk` paths at the top of `bin/nastran` (they point at `/usr/users/bob/nast95`). The checked-in `nastrn.exe` and `chkfil.exe` are 32-bit SPARC Solaris binaries and `bin/linknas` links with Sun `f77`, so they do not run on x86-64 Linux; there `demoout/` is the reference output.
+`bin/nastran <problem>` writes a run script `<problem>.cmd` for `<problem>.inp` and offers to run it; the run writes `<problem>.out`, `.log`, `.dic`, `.plt` and `.pch`. Before use, edit the `rfdir`, `nasexec` and `naschk` paths at the top of `bin/nastran` (they point at `/usr/users/bob/nast95`). The checked-in `nastrn.exe` and `chkfil.exe` are 32-bit SPARC Solaris binaries and `bin/linknas` links with Sun `f77`, so they do not run on x86-64 Linux; there `demoout/` is the reference output.
 
 ## Python package
 

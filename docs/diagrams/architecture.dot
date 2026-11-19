@@ -14,7 +14,7 @@ digraph nastran95 {
 
   subgraph cluster_fortran {
     label="COSMIC NASTRAN executable (Fortran 77, 1995 UNIX release)"; style="rounded,filled"; fillcolor="#e8f0fb"; color="#4a74b5";
-    script  [label="bin/nastran (csh)\nsets FTnn / RFDIR / DBMEM / OCMEM env,\nruns chkfil.exe then nastrn.exe"];
+    script  [label="bin/nastran (csh)\nruns chkfil.exe, writes <problem>.cmd:\nLOGNM / DICTNM / FTNnn / RFDIR / DBMEM env,\nnastrn.exe < .inp > .out"];
     exe     [label="bin/nastrn.exe + nastlib.a\n32-bit SPARC Solaris build\n(PROGRAM NASTRN, bin/nastrn.f; linked by bin/linknas)"];
     preface [label="Preface  mis/semint.f\nNASCAR, XCSA (Executive Control),\nIFP1 (Case Control), XSORT2 + IFP/IFP3 (Bulk Data),\nXGPI (compile DMAP to OSCAR)"];
     rf      [label="rf/  Rigid Formats\nDISP0-19, HEAT1/3/9, AERO9-11\n(DMAP solution sequences)", fillcolor="#dbe8f7"];
@@ -23,7 +23,7 @@ digraph nastran95 {
     mis     [label="mis/  1,676 module + element routines (*.f, *.COM)"];
     bd      [label="bd/  40 BLOCK DATA tables"];
     mds     [label="mds/  machine-dependent layer\nGINO / DBM file I/O, packing, timers"];
-    out     [label="FT06 listing (.out), .log, .dic,\nplot file (.plt), punch", fillcolor="#fff6d5"];
+    out     [label="listing (.out, stdout), .log, .dic,\nplot file (.plt), punch", fillcolor="#fff6d5"];
     script -> exe -> preface;
     rf -> preface [label="RFDIR"];
     alt -> preface [label="ALTER in\nExecutive Control", style=dashed];
@@ -68,7 +68,7 @@ digraph nastran95 {
     harness -> pytest;
   }
 
-  inp -> script [label="FT05"];
+  inp -> script [label="<problem>.inp"];
   inp -> reference [label="RF1 decks"];
   demoout -> reference [label="parse"];
   reference -> golden [label="generate", constraint=false];
